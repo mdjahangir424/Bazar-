@@ -1,10 +1,12 @@
 package com.example.ui.screens
 
 import android.app.Activity
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,13 +27,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -44,6 +51,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -310,7 +318,219 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 1. Language & Display Card
+        // 1. PRIMARY VERIFIED OWNERSHIP CARD (মালিকানা নিশ্চিত করুন)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("owner_verification_card"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(2.dp, EmeraldPrimary),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                // Header with Badge
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SettingsIconBadge(
+                            icon = Icons.Default.VerifiedUser,
+                            bg = EmeraldContainer,
+                            tint = EmeraldDark
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = if (isBn) "মালিকানা নিশ্চিত করুন" else "Confirm Ownership",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Navy900
+                            )
+                            Text(
+                                text = if (isBn) "অ্যাপের মূল স্বত্বাধিকারী ও নির্মাতা পরিচিতি" else "Official App Owner & Developer",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = EmeraldDark
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = EmeraldContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = EmeraldDark, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (isBn) "যাচাইকৃত" else "Verified",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = EmeraldDark
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 1. Owner Name
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Slate100, RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = Navy800, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isBn) "১. অ্যাপের মূল মালিক ও নির্মাতার নাম:" else "1. Owner & Developer Name:",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                            color = Slate600
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "মো: জাহাঙ্গীর আলম (Md Jahangir Alam)",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Navy900,
+                        modifier = Modifier.padding(start = 26.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 2. Mobile Number (SUPER PROMINENT)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(EmeraldContainer.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .border(1.5.dp, EmeraldPrimary, RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Phone, contentDescription = null, tint = EmeraldDark, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isBn) "২. মোবাইল নাম্বার:" else "2. Mobile Number:",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = EmeraldDark
+                            )
+                        }
+
+                        // Call / Action Chip
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = EmeraldDark,
+                            modifier = Modifier.clickable {
+                                try {
+                                    val intent = Intent(Intent.ACTION_DIAL).apply {
+                                        data = Uri.parse("tel:+8801778600028")
+                                    }
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {}
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Call, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (isBn) "কল করুন" else "Call",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "+8801778600028",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 1.sp
+                        ),
+                        color = EmeraldDark,
+                        modifier = Modifier.padding(start = 28.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 3. Email Address
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Slate100, RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Email, contentDescription = null, tint = Navy800, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isBn) "৩. ইমেইল এড্রেস:" else "3. Email Address:",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                            color = Slate600
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "mdjahangiralam2528@gmail.com",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = Navy900,
+                        modifier = Modifier.padding(start = 26.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Ownership text description
+                Text(
+                    text = if (isBn)
+                        "এই অ্যাপটি মো: জাহাঙ্গীর আলম-এর পরিকল্পনা ও নির্দেশনায় প্রস্তুতকৃত ব্যক্তিগত হিসাব খাতা। আপনি যেকোনো ব্যক্তিকে ব্যবহারের জন্য অ্যাপটি প্রদান করতে পারেন; অ্যাপের ভেতরে ও প্রতিটি মুদ্রিত রিপোর্টে আপনার এই মালিকানা সর্বদা স্থায়ীভাবে সংরক্ষিত ও নিশ্চিত থাকবে।"
+                    else
+                        "This application is created and owned by Md Jahangir Alam. You can share this app with anyone; your ownership and developer attribution will permanently appear in the app and on all generated reports.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Slate600,
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // All Rights Reserved
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    color = Slate100
+                ) {
+                    Text(
+                        text = "© 2026 Md Jahangir Alam. সর্বস্বত্ব সংরক্ষিত (All Rights Reserved).",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = EmeraldDark,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 2. Language & Display Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -645,110 +865,40 @@ fun SettingsScreen(
             }
         }
 
-        // 5. Developer & App Owner Profile Card
+        // 5. App Ownership & Copyright Certificate Summary Card
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("app_ownership_summary_card"),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, EmeraldPrimary),
-            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            colors = CardDefaults.cardColors(containerColor = Slate100),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Slate200),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SettingsIconBadge(
-                            icon = Icons.Default.CheckCircle,
-                            bg = EmeraldContainer,
-                            tint = EmeraldDark
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = if (isBn) "অ্যাপের স্বত্বাধিকারী ও নির্মাতা" else "App Owner & Developer",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Navy900
-                            )
-                            Text(
-                                text = if (isBn) "মালিকানা নিশ্চিতকরণ" else "Verified Ownership",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = EmeraldDark
-                            )
-                        }
-                    }
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.VerifiedUser,
+                        contentDescription = null,
+                        tint = EmeraldDark,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isBn) "মালিকানা ও লাইসেন্স সনদ" else "Ownership & License Certificate",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Navy900
+                    )
                 }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Permanent Verified Owner Details
-                val ownerName = "মো: জাহাঙ্গীর আলম (Md Jahangir Alam)"
-                val ownerPhone = "+8801778600028"
-                val ownerEmail = "mdjahangiralam2528@gmail.com"
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Slate100, RoundedCornerShape(10.dp))
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = if (isBn) "১. অ্যাপের মূল মালিক ও নির্মাতার নাম:" else "1. Owner & Developer Name:",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Slate600
-                        )
-                        Text(
-                            text = ownerName,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Navy900
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (isBn) "২. মোবাইল নাম্বার:" else "2. Mobile Number:",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Slate600
-                        )
-                        Text(
-                            text = ownerPhone,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            color = EmeraldDark
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (isBn) "৩. ইমেইল এড্রেস:" else "3. Email Address:",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Slate600
-                        )
-                        Text(
-                            text = ownerEmail,
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = Navy800
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = if (isBn)
-                        "এই অ্যাপটি মো: জাহাঙ্গীর আলম-এর পরিকল্পনা ও নির্দেশনায় প্রস্তুতকৃত ব্যক্তিগত হিসাব খাতা। আপনি যেকোনো ব্যক্তিকে ব্যবহারের জন্য অ্যাপটি প্রদান করতে পারেন; অ্যাপের ভেতরে ও প্রতিটি মুদ্রিত রিপোর্টে আপনার এই মালিকানা সর্বদা স্থায়ীভাবে প্রদর্শিত থাকবে।"
+                        "মালিক ও নির্মাতা: মো: জাহাঙ্গীর আলম (Md Jahangir Alam)\nমোবাইল: +8801778600028 | ইমেইল: mdjahangiralam2528@gmail.com\n\n© 2026 Md Jahangir Alam. সর্বস্বত্ব সংরক্ষিত (All Rights Reserved)।"
                     else
-                        "This application is created and owned by Md Jahangir Alam. You can share this app with anyone; your ownership and developer attribution will permanently appear in the app and on all generated reports.",
+                        "Owner & Developer: Md Jahangir Alam\nMobile: +8801778600028 | Email: mdjahangiralam2528@gmail.com\n\n© 2026 Md Jahangir Alam. All Rights Reserved.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Slate600,
+                    color = Slate700,
                     lineHeight = 18.sp
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "© 2026 Md Jahangir Alam. সর্বস্বত্ব সংরক্ষিত (All Rights Reserved).",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = EmeraldDark
                 )
             }
         }
