@@ -43,7 +43,9 @@ object PdfReportGenerator {
         expenses: List<MarketExpense>,
         outstanding: List<OutstandingEntry>,
         payments: List<PaymentRecord>,
-        language: AppLanguage
+        language: AppLanguage,
+        signerName: String = "মো: জাহাঙ্গীর আলম",
+        signerEmail: String = "mdjahangiralam2528@gmail.com"
     ): File {
         val document = PdfDocument()
         val pageWidth = 595 // A4 standard width in points (72 dpi)
@@ -93,7 +95,7 @@ object PdfReportGenerator {
         fun checkNewPage(neededHeight: Float) {
             if (y + neededHeight > pageHeight - margin - 40f) {
                 // Draw footer on current page
-                drawPageFooter(canvas, pageNumber, pageWidth, pageHeight, margin, textPaint)
+                drawPageFooter(canvas, pageNumber, pageWidth, pageHeight, margin, textPaint, signerName)
                 document.finishPage(page)
 
                 pageNumber++
@@ -336,23 +338,29 @@ object PdfReportGenerator {
         }
 
         // Signature Line
-        checkNewPage(65f)
+        checkNewPage(95f)
         y += 25f
         val sigLinePaint = Paint().apply {
             color = Color.BLACK
             strokeWidth = 1f
         }
-        val sigLeft = margin + 30f
+        val sigLeft = margin + 20f
         val sigRight = pageWidth - margin - 150f
 
-        canvas.drawLine(sigLeft, y, sigLeft + 120f, y, sigLinePaint)
-        canvas.drawText(if (isBn) "প্রস্তুতকারকের স্বাক্ষর" else "Prepared By", sigLeft + 15f, y + 14f, subHeaderPaint)
+        canvas.drawLine(sigLeft, y, sigLeft + 160f, y, sigLinePaint)
+        canvas.drawText(if (isBn) "স্বাক্ষর: $signerName" else "Signature: $signerName", sigLeft + 5f, y + 14f, subHeaderPaint)
+        if (signerEmail.isNotBlank()) {
+            canvas.drawText(if (isBn) "গুগল ক্লাউড আইডি: $signerEmail" else "Google Cloud ID: $signerEmail", sigLeft + 5f, y + 26f, subHeaderPaint)
+            canvas.drawText(if (isBn) "প্রস্তুতকারক (Google Cloud Login)" else "Prepared by (Google Cloud)", sigLeft + 5f, y + 38f, subHeaderPaint)
+        } else {
+            canvas.drawText(if (isBn) "প্রস্তুতকারক (হিসাব খাতা)" else "Prepared by", sigLeft + 5f, y + 26f, subHeaderPaint)
+        }
 
-        canvas.drawLine(sigRight, y, sigRight + 120f, y, sigLinePaint)
+        canvas.drawLine(sigRight, y, sigRight + 130f, y, sigLinePaint)
         canvas.drawText(if (isBn) "অনুমোদনকারীর স্বাক্ষর" else "Authorized Signature", sigRight + 10f, y + 14f, subHeaderPaint)
 
         // Draw footer on last page
-        drawPageFooter(canvas, pageNumber, pageWidth, pageHeight, margin, textPaint)
+        drawPageFooter(canvas, pageNumber, pageWidth, pageHeight, margin, textPaint, signerName)
         document.finishPage(page)
 
         // Save PDF to cache
@@ -375,13 +383,170 @@ object PdfReportGenerator {
         return pdfFile
     }
 
-    private fun drawPageFooter(canvas: Canvas, pageNumber: Int, pageWidth: Int, pageHeight: Int, margin: Float, textPaint: Paint) {
-        val footerText = "Hisab Khata – Page $pageNumber"
+    private fun drawPageFooter(
+        canvas: Canvas,
+        pageNumber: Int,
+        pageWidth: Int,
+        pageHeight: Int,
+        margin: Float,
+        textPaint: Paint,
+        signerName: String = ""
+    ) {
+        val footerText = if (signerName.isNotBlank()) {
+            "হিসাব খাতা | প্রস্তুতকারী (Google Cloud): $signerName | পৃষ্ঠা $pageNumber"
+        } else {
+            "হিসাব খাতা | পৃষ্ঠা $pageNumber"
+        }
         val textBounds = Rect()
         textPaint.getTextBounds(footerText, 0, footerText.length, textBounds)
         val fx = (pageWidth - textBounds.width()) / 2f
         val fy = pageHeight - margin + 10f
         canvas.drawText(footerText, fx, fy, textPaint)
+    }
+
+    /**
+     * Generate an official Payment Receipt / রশিদ (Money Voucher) PDF with Google Cloud user attribution
+     */
+    fun generateReceiptPdf(
+        context: Context,
+        receiptId: String,
+        date: String,
+        title: String,
+        amount: Double,
+        note: String,
+        signerName: String,
+        signerEmail: String,
+        language: AppLanguage
+    ): File {
+        val document = PdfDocument()
+        val pageWidth = 595
+        val pageHeight = 420 // A5 landscape format for receipt
+        val margin = 32f
+
+        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
+        val page = document.startPage(pageInfo)
+        val canvas = page.canvas
+
+        val isBn = language == AppLanguage.BANGLA
+
+        // Border
+        val borderPaint = Paint().apply {
+            color = Color.rgb(15, 39, 68)
+            style = Paint.Style.STROKE
+            strokeWidth = 1.5f
+        }
+        canvas.drawRect(margin, margin, pageWidth - margin, pageHeight - margin, borderPaint)
+
+        // Header Background
+        val headerBg = Paint().apply {
+            color = Color.rgb(241, 245, 249)
+            style = Paint.Style.FILL
+        }
+        canvas.drawRect(margin + 2f, margin + 2f, pageWidth - margin - 2f, margin + 65f, headerBg)
+
+        val titlePaint = Paint().apply {
+            color = Color.rgb(15, 39, 68)
+            textSize = 16f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val subPaint = Paint().apply {
+            color = Color.DKGRAY
+            textSize = 10f
+            isAntiAlias = true
+        }
+        val boldPaint = Paint().apply {
+            color = Color.BLACK
+            textSize = 11f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val bodyPaint = Paint().apply {
+            color = Color.BLACK
+            textSize = 11f
+            isAntiAlias = true
+        }
+
+        // Header Text
+        val receiptHeading = if (isBn) "হিসাব খাতা – টাকা প্রাপ্তি / পরিশোধের রশিদ" else "Hisab Khata – Payment Receipt"
+        canvas.drawText(receiptHeading, margin + 15f, margin + 28f, titlePaint)
+
+        val recNoText = (if (isBn) "রশিদ নং: #" else "Receipt No: #") + receiptId.takeLast(6).uppercase()
+        val dateText = (if (isBn) "তারিখ: " else "Date: ") + BanglaFormatter.formatToDisplayDate(date, isBn)
+        canvas.drawText("$recNoText   |   $dateText", margin + 15f, margin + 48f, subPaint)
+
+        // Content
+        var cy = margin + 95f
+        val lineSpacing = 26f
+
+        canvas.drawText(if (isBn) "হিসাবের খাত / বিবরণ:" else "Description:", margin + 25f, cy, subPaint)
+        canvas.drawText(title, margin + 170f, cy, boldPaint)
+        cy += lineSpacing
+
+        if (note.isNotBlank()) {
+            canvas.drawText(if (isBn) "মন্তব্য / নোট:" else "Note / Reference:", margin + 25f, cy, subPaint)
+            canvas.drawText(note, margin + 170f, cy, bodyPaint)
+            cy += lineSpacing
+        }
+
+        // Amount Box
+        val amountBg = Paint().apply {
+            color = Color.rgb(236, 253, 245)
+            style = Paint.Style.FILL
+        }
+        val amountBorder = Paint().apply {
+            color = Color.rgb(16, 185, 129)
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+        }
+        canvas.drawRect(margin + 25f, cy - 5f, pageWidth - margin - 25f, cy + 35f, amountBg)
+        canvas.drawRect(margin + 25f, cy - 5f, pageWidth - margin - 25f, cy + 35f, amountBorder)
+
+        val amountPaint = Paint().apply {
+            color = Color.rgb(6, 95, 70)
+            textSize = 14f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val amountText = (if (isBn) "পরিশোধকৃত টাকা: " else "Amount: ") + BanglaFormatter.formatCurrency(amount, isBn)
+        canvas.drawText(amountText, margin + 38f, cy + 20f, amountPaint)
+
+        // Signature section
+        val sigY = pageHeight - margin - 45f
+        val sigLinePaint = Paint().apply {
+            color = Color.BLACK
+            strokeWidth = 1f
+        }
+
+        val sigLeft = margin + 25f
+        val sigRight = pageWidth - margin - 170f
+
+        // Left Signature: Logged-in Google Cloud user
+        canvas.drawLine(sigLeft, sigY, sigLeft + 160f, sigY, sigLinePaint)
+        canvas.drawText(if (isBn) "স্বাক্ষর: $signerName" else "Signature: $signerName", sigLeft + 5f, sigY + 14f, subPaint)
+        if (signerEmail.isNotBlank()) {
+            canvas.drawText(if (isBn) "গুগল ক্লাউড আইডি: $signerEmail" else "Google Cloud ID: $signerEmail", sigLeft + 5f, sigY + 26f, subPaint)
+            canvas.drawText(if (isBn) "আদায়কারী / প্রস্তুতকারক" else "Prepared by (Google Cloud)", sigLeft + 5f, sigY + 38f, subPaint)
+        } else {
+            canvas.drawText(if (isBn) "আদায়কারী / প্রস্তুতকারক" else "Prepared by", sigLeft + 5f, sigY + 26f, subPaint)
+        }
+
+        // Right Signature: Authorized
+        canvas.drawLine(sigRight, sigY, sigRight + 140f, sigY, sigLinePaint)
+        canvas.drawText(if (isBn) "অনুমোদনকারীর স্বাক্ষর" else "Authorized Signature", sigRight + 10f, sigY + 14f, subPaint)
+
+        document.finishPage(page)
+
+        val timestamp = System.currentTimeMillis()
+        val fileName = "Receipt_${receiptId.takeLast(6)}_$timestamp.pdf"
+        val pdfFile = File(context.cacheDir, fileName)
+        val outputStream = FileOutputStream(pdfFile)
+        document.writeTo(outputStream)
+        outputStream.flush()
+        outputStream.close()
+        document.close()
+
+        return pdfFile
     }
 
     /**

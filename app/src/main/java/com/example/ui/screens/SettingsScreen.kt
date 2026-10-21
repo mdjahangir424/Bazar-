@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
@@ -644,9 +645,117 @@ fun SettingsScreen(
             }
         }
 
+        // 5. Developer & App Owner Profile Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, EmeraldPrimary),
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SettingsIconBadge(
+                            icon = Icons.Default.CheckCircle,
+                            bg = EmeraldContainer,
+                            tint = EmeraldDark
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = if (isBn) "অ্যাপের স্বত্বাধিকারী ও নির্মাতা" else "App Owner & Developer",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Navy900
+                            )
+                            Text(
+                                text = if (isBn) "মালিকানা নিশ্চিতকরণ" else "Verified Ownership",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = EmeraldDark
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Permanent Verified Owner Details
+                val ownerName = "মো: জাহাঙ্গীর আলম (Md Jahangir Alam)"
+                val ownerPhone = "+8801778600028"
+                val ownerEmail = "mdjahangiralam2528@gmail.com"
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Slate100, RoundedCornerShape(10.dp))
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = if (isBn) "১. অ্যাপের মূল মালিক ও নির্মাতার নাম:" else "1. Owner & Developer Name:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Slate600
+                        )
+                        Text(
+                            text = ownerName,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = Navy900
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = if (isBn) "২. মোবাইল নাম্বার:" else "2. Mobile Number:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Slate600
+                        )
+                        Text(
+                            text = ownerPhone,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = EmeraldDark
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = if (isBn) "৩. ইমেইল এড্রেস:" else "3. Email Address:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Slate600
+                        )
+                        Text(
+                            text = ownerEmail,
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = Navy800
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = if (isBn)
+                        "এই অ্যাপটি মো: জাহাঙ্গীর আলম-এর পরিকল্পনা ও নির্দেশনায় প্রস্তুতকৃত ব্যক্তিগত হিসাব খাতা। আপনি যেকোনো ব্যক্তিকে ব্যবহারের জন্য অ্যাপটি প্রদান করতে পারেন; অ্যাপের ভেতরে ও প্রতিটি মুদ্রিত রিপোর্টে আপনার এই মালিকানা সর্বদা স্থায়ীভাবে প্রদর্শিত থাকবে।"
+                    else
+                        "This application is created and owned by Md Jahangir Alam. You can share this app with anyone; your ownership and developer attribution will permanently appear in the app and on all generated reports.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Slate600,
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "© 2026 Md Jahangir Alam. সর্বস্বত্ব সংরক্ষিত (All Rights Reserved).",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = EmeraldDark
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 5. About App & Architecture Card
+        // 6. About App & System Architecture Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -658,7 +767,7 @@ fun SettingsScreen(
                     Icon(Icons.Default.Info, contentDescription = null, tint = Navy800)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isBn) "হিসাব খাতা সম্পর্কে" else "About Hisab Khata",
+                        text = if (isBn) "হিসাব খাতা সিস্টেম তথ্য" else "System Architecture",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                         color = Navy800
                     )
@@ -666,16 +775,16 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = if (isBn)
-                        "হিসাব খাতা – দৈনিক হিসাব একটি ১০০% অফলাইন ও ব্যক্তিগত আর্থিক রেকর্ড ম্যানেজমেন্ট সিস্টেম। এটি আপনার ফোনের নিজস্ব SQLite/Room ডাটাবেজে নিরাপদে সংরক্ষিত থাকে। কোনো ইন্টারনেট বা সার্ভার প্রয়োজন হয় না।"
+                        "হিসাব খাতা – দৈনিক হিসাব একটি ১০০% অফলাইন ও ব্যক্তিগত আর্থিক রেকর্ড ম্যানেজমেন্ট সিস্টেম। এটি আপনার ফোনের নিজস্ব SQLite/Room ডাটাবেজ এবং গুগলের ফায়ারবেস ক্লাউড স্টোরেজে সুরক্ষিতভাবে সংরক্ষিত থাকে।"
                     else
-                        "Hisab Khata – Daily Hisab is a 100% offline personal finance and outstanding ledger management app powered by Android Room SQLite on-device storage.",
+                        "Hisab Khata – Daily Hisab is a personal finance and outstanding ledger management app powered by Android Room SQLite on-device storage and Google Firebase Cloud Firestore.",
                     style = MaterialTheme.typography.bodySmall,
                     color = Slate600,
                     lineHeight = 18.sp
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Version: 1.0.0 (Production Build)",
+                    text = "Version: 1.0.0 (Production Release)",
                     style = MaterialTheme.typography.labelSmall,
                     color = Slate600
                 )

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Payment
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sort
@@ -48,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -72,6 +74,7 @@ import com.example.ui.theme.Slate300
 import com.example.ui.theme.Slate600
 import com.example.ui.util.AppLanguage
 import com.example.ui.util.AppStrings
+import com.example.ui.util.PdfReportGenerator
 import com.example.ui.util.BanglaFormatter
 import com.example.ui.viewmodel.FinancialViewModel
 import kotlinx.coroutines.launch
@@ -81,10 +84,12 @@ fun OutstandingScreen(
     viewModel: FinancialViewModel,
     snackbarHostState: SnackbarHostState
 ) {
+    val context = LocalContext.current
     val language by viewModel.language.collectAsStateWithLifecycle()
     val summary by viewModel.summary.collectAsStateWithLifecycle()
     val allOutstanding by viewModel.outstanding.collectAsStateWithLifecycle()
     val allPayments by viewModel.payments.collectAsStateWithLifecycle()
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isBn = language == AppLanguage.BANGLA
     val scope = rememberCoroutineScope()
 
@@ -473,7 +478,7 @@ fun OutstandingScreen(
                         text = AppStrings.actions(language),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                         color = Color.White,
-                        modifier = Modifier.width(68.dp)
+                        modifier = Modifier.width(102.dp)
                     )
                 }
             }
@@ -541,7 +546,41 @@ fun OutstandingScreen(
                                 }
                             }
 
-                            Row(modifier = Modifier.width(68.dp)) {
+                            Row(modifier = Modifier.width(102.dp)) {
+                                IconButton(
+                                    onClick = {
+                                        try {
+                                            val signerName = currentUser?.displayName?.takeIf { it.isNotBlank() }
+                                                ?: currentUser?.email?.substringBefore("@")
+                                                ?: (if (isBn) "মো: জাহাঙ্গীর আলম" else "Md Jahangir Alam")
+                                            val signerEmail = currentUser?.email ?: "mdjahangiralam2528@gmail.com"
+                                            val receiptFile = PdfReportGenerator.generateReceiptPdf(
+                                                context = context,
+                                                receiptId = item.id.toString(),
+                                                date = item.date,
+                                                title = if (isBn) "বাকি হিসাব মেমো" else "Outstanding Due Memo",
+                                                amount = item.amount,
+                                                note = item.note,
+                                                signerName = signerName,
+                                                signerEmail = signerEmail,
+                                                language = language
+                                            )
+                                            PdfReportGenerator.printPdfFile(context, receiptFile, "Due-Memo-${item.id}")
+                                        } catch (e: Exception) {
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("Print error: ${e.message}")
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Print,
+                                        contentDescription = "Print Memo",
+                                        tint = Navy800,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                                 IconButton(
                                     onClick = { editingOutstanding = item },
                                     modifier = Modifier.size(32.dp)
@@ -631,7 +670,41 @@ fun OutstandingScreen(
                                 }
                             }
 
-                            Row(modifier = Modifier.width(68.dp)) {
+                            Row(modifier = Modifier.width(102.dp)) {
+                                IconButton(
+                                    onClick = {
+                                        try {
+                                            val signerName = currentUser?.displayName?.takeIf { it.isNotBlank() }
+                                                ?: currentUser?.email?.substringBefore("@")
+                                                ?: (if (isBn) "মো: জাহাঙ্গীর আলম" else "Md Jahangir Alam")
+                                            val signerEmail = currentUser?.email ?: "mdjahangiralam2528@gmail.com"
+                                            val receiptFile = PdfReportGenerator.generateReceiptPdf(
+                                                context = context,
+                                                receiptId = item.id.toString(),
+                                                date = item.date,
+                                                title = if (isBn) "টাকা পরিশোধ রশিদ (জমা মেমো)" else "Payment Receipt",
+                                                amount = item.amount,
+                                                note = item.note,
+                                                signerName = signerName,
+                                                signerEmail = signerEmail,
+                                                language = language
+                                            )
+                                            PdfReportGenerator.printPdfFile(context, receiptFile, "Receipt-${item.id}")
+                                        } catch (e: Exception) {
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("Print error: ${e.message}")
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Print,
+                                        contentDescription = "Print Receipt",
+                                        tint = EmeraldDark,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                                 IconButton(
                                     onClick = { editingPayment = item },
                                     modifier = Modifier.size(32.dp)

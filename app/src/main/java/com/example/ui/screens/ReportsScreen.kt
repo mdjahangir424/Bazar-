@@ -84,8 +84,15 @@ fun ReportsScreen(
     val allExpenses by viewModel.expenses.collectAsStateWithLifecycle()
     val allOutstanding by viewModel.outstanding.collectAsStateWithLifecycle()
     val allPayments by viewModel.payments.collectAsStateWithLifecycle()
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isBn = language == AppLanguage.BANGLA
     val scope = rememberCoroutineScope()
+
+    // Google Cloud Logged-in user information for report & receipt signature
+    val signerName = currentUser?.displayName?.takeIf { it.isNotBlank() }
+        ?: currentUser?.email?.substringBefore("@")
+        ?: (if (isBn) "মো: জাহাঙ্গীর আলম" else "Md Jahangir Alam")
+    val signerEmail = currentUser?.email ?: "mdjahangiralam2528@gmail.com"
 
     var selectedReportType by remember { mutableStateOf(ReportType.ALL) }
     var selectedPeriod by remember { mutableStateOf(ReportPeriod.THIS_MONTH) }
@@ -296,12 +303,14 @@ fun ReportsScreen(
                             expenses = reportExpenses,
                             outstanding = reportOutstanding,
                             payments = reportPayments,
-                            language = language
+                            language = language,
+                            signerName = signerName,
+                            signerEmail = signerEmail
                         )
                         PdfReportGenerator.openOrSharePdf(context, pdfFile)
                         scope.launch {
                             snackbarHostState.showSnackbar(
-                                if (isBn) "পিডিএফ ফাইল সফলভাবে তৈরি হয়েছে!" else "PDF generated successfully!"
+                                if (isBn) "পিডিএফ রিপোর্ট সফলভাবে তৈরি হয়েছে!" else "PDF generated successfully!"
                             )
                         }
                     } catch (e: Exception) {
@@ -336,7 +345,9 @@ fun ReportsScreen(
                             expenses = reportExpenses,
                             outstanding = reportOutstanding,
                             payments = reportPayments,
-                            language = language
+                            language = language,
+                            signerName = signerName,
+                            signerEmail = signerEmail
                         )
                         PdfReportGenerator.printPdfFile(context, pdfFile)
                     } catch (e: Exception) {
@@ -525,31 +536,49 @@ fun ReportsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(horizontalAlignment = Alignment.Start) {
                         Box(
                             modifier = Modifier
-                                .width(100.dp)
+                                .width(130.dp)
                                 .height(1.dp)
                                 .background(Color.Black)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (isBn) "প্রস্তুতকারক" else "Prepared By",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Slate600
+                            text = if (isBn) "স্বাক্ষর: $signerName" else "Signature: $signerName",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = Navy900
                         )
+                        if (signerEmail.isNotBlank()) {
+                            Text(
+                                text = if (isBn) "গুগল ক্লাউড আইডি: $signerEmail" else "Google Cloud ID: $signerEmail",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Slate600
+                            )
+                            Text(
+                                text = if (isBn) "প্রস্তুতকারক (Google Cloud Login)" else "Prepared by (Google Cloud)",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                                color = EmeraldDark
+                            )
+                        } else {
+                            Text(
+                                text = if (isBn) "প্রস্তুতকারক (হিসাব খাতা)" else "Prepared by",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Slate600
+                            )
+                        }
                     }
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
                             modifier = Modifier
-                                .width(100.dp)
+                                .width(110.dp)
                                 .height(1.dp)
                                 .background(Color.Black)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (isBn) "অনুমোদনকারী" else "Authorized Signature",
+                            text = if (isBn) "অনুমোদনকারীর স্বাক্ষর" else "Authorized Signature",
                             style = MaterialTheme.typography.labelSmall,
                             color = Slate600
                         )
