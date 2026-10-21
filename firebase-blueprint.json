@@ -1,0 +1,117 @@
+{
+  "entities": {
+    "MarketExpense": {
+      "title": "MarketExpense",
+      "description": "Daily market grocery expense record for a user",
+      "type": "object",
+      "properties": {
+        "serialNo": {
+          "type": "integer",
+          "description": "Sequential entry number"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date in YYYY-MM-DD format"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Expense amount in BDT"
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional expense note"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User ID of the owner"
+        }
+      },
+      "required": ["date", "amount", "userId"]
+    },
+    "OutstandingEntry": {
+      "title": "OutstandingEntry",
+      "description": "Daily outstanding amount incurred by user",
+      "type": "object",
+      "properties": {
+        "serialNo": {
+          "type": "integer",
+          "description": "Sequential entry number"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date in YYYY-MM-DD format"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Outstanding amount in BDT"
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional note"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User ID of the owner"
+        }
+      },
+      "required": ["date", "amount", "userId"]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "Outstanding repayment record",
+      "type": "object",
+      "properties": {
+        "serialNo": {
+          "type": "integer",
+          "description": "Sequential entry number"
+        },
+        "date": {
+          "type": "string",
+          "description": "Date in YYYY-MM-DD format"
+        },
+        "amount": {
+          "type": "number",
+          "description": "Payment amount in BDT"
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional note"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation"
+        },
+        "userId": {
+          "type": "string",
+          "description": "User ID of the owner"
+        }
+      },
+      "required": ["date", "amount", "userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/market_expenses/{expenseId}": {
+      "schema": "#/entities/MarketExpense",
+      "description": "Market expenses scoped to the authenticated user"
+    },
+    "/users/{userId}/outstanding_entries/{entryId}": {
+      "schema": "#/entities/OutstandingEntry",
+      "description": "Outstanding entries scoped to the authenticated user"
+    },
+    "/users/{userId}/payment_records/{paymentId}": {
+      "schema": "#/entities/PaymentRecord",
+      "description": "Payments scoped to the authenticated user"
+    }
+  }
+}

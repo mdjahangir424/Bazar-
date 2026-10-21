@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.app.Activity
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -73,6 +74,11 @@ import com.example.ui.theme.Navy900
 import com.example.ui.theme.Slate100
 import com.example.ui.theme.Slate200
 import com.example.ui.theme.Slate600
+import com.example.ui.theme.Slate700
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Sync
 import com.example.ui.util.AppLanguage
 import com.example.ui.util.BanglaFormatter
 import com.example.ui.viewmodel.FinancialViewModel
@@ -88,6 +94,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val language by viewModel.language.collectAsStateWithLifecycle()
     val allowNegative by viewModel.allowNegativeBalance.collectAsStateWithLifecycle()
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isBn = language == AppLanguage.BANGLA
     val scope = rememberCoroutineScope()
 
@@ -133,6 +140,172 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = Slate600
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 0. Google Cloud Backup & Account Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (currentUser != null) EmeraldContainer else Navy800
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                if (currentUser != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SettingsIconBadge(
+                            icon = Icons.Default.CloudDone,
+                            bg = EmeraldPrimary,
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isBn) "গুগল ক্লাউড সিঙ্ক সক্রিয়" else "Google Cloud Sync Active",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                color = EmeraldDark
+                            )
+                            Text(
+                                text = currentUser?.email ?: (if (isBn) "সংযুক্ত" else "Connected"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Slate700
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = if (isBn)
+                            "আপনার সমস্ত বাজার খরচ ও বাকি হিসাব গুগলের ক্লাউড ডাটাবেজে নিরাপদে সংরক্ষিত হচ্ছে। অ্যাপ মুছে গেলেও জিমেইল দিয়ে লগইন করলে ডাটা সাথে সাথে ফেরত আসবে।"
+                        else
+                            "All records are safely synced to Google Cloud. Data will be restored automatically upon re-login.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Slate700
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.syncFromCloud { res ->
+                                    scope.launch {
+                                        if (res.isSuccess) {
+                                            snackbarHostState.showSnackbar(
+                                                if (isBn) "ক্লাউড থেকে সফলভাবে সিঙ্ক সম্পন্ন হয়েছে" else "Cloud sync completed successfully"
+                                            )
+                                        } else {
+                                            snackbarHostState.showSnackbar("Sync failed: ${res.exceptionOrNull()?.message}")
+                                        }
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldDark),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isBn) "এখনই সিঙ্ক করুন" else "Sync Now", fontSize = 12.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.signOut {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            if (isBn) "লগ আউট সম্পন্ন হয়েছে" else "Signed out successfully"
+                                        )
+                                    }
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (isBn) "লগ আউট" else "Sign Out", fontSize = 12.sp, color = CrimsonDanger)
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SettingsIconBadge(
+                            icon = Icons.Default.CloudSync,
+                            bg = Color(0x33FFFFFF),
+                            tint = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isBn) "ক্লাউড ব্যাকআপ ও গুগল লগইন" else "Cloud Backup & Google Login",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White
+                            )
+                            Text(
+                                text = if (isBn) "ডাটা কখনো হারাবে না" else "Never lose your financial records",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFCBD5E1)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = if (isBn)
+                            "মোবাইল হারিয়ে গেলে, পরিবর্তন করলে বা অ্যাপটি মুছে গেলেও আপনার একই গুগল আইডি দিয়ে লগইন করলে সমস্ত বাজার খরচ ও বাকি হিসাব সাথে সাথে ফেরত পাবেন।"
+                        else
+                            "Sign in with Google so even if you uninstall the app or switch phones, you can recover all records instantly.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFE2E8F0),
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = {
+                            val activity = context as? Activity
+                            if (activity != null) {
+                                viewModel.signInWithGoogle(
+                                    activity = activity,
+                                    onSuccess = {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                if (isBn) "গুগল দিয়ে সফলভাবে লগইন হয়েছে এবং ক্লাউড সিঙ্ক সক্রিয়!" else "Signed in with Google! Cloud sync active."
+                                            )
+                                        }
+                                    },
+                                    onError = { err ->
+                                        scope.launch { snackbarHostState.showSnackbar(err) }
+                                    }
+                                )
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("google_signin_button")
+                    ) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isBn) "গুগল দিয়ে সাইন ইন করুন (Google Login)" else "Sign in with Google",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 

@@ -76,7 +76,14 @@ class MainActivity : ComponentActivity() {
             outstandingDao = database.outstandingDao(),
             paymentDao = database.paymentDao()
         )
-        val factory = FinancialViewModelFactory(repository)
+        val authManager = com.example.data.auth.AuthManager(applicationContext)
+        val syncManager = com.example.data.cloud.FirestoreSyncManager(
+            context = applicationContext,
+            expenseDao = database.expenseDao(),
+            outstandingDao = database.outstandingDao(),
+            paymentDao = database.paymentDao()
+        )
+        val factory = FinancialViewModelFactory(repository, authManager, syncManager)
         viewModel = ViewModelProvider(this, factory)[FinancialViewModel::class.java]
 
         setContent {

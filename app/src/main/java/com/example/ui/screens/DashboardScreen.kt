@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -86,6 +88,7 @@ fun DashboardScreen(
     val language by viewModel.language.collectAsStateWithLifecycle()
     val summary by viewModel.summary.collectAsStateWithLifecycle()
     val expenses by viewModel.expenses.collectAsStateWithLifecycle()
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isBn = language == AppLanguage.BANGLA
     val scope = rememberCoroutineScope()
 
@@ -105,7 +108,7 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = AppStrings.appTitle(language),
                     style = MaterialTheme.typography.titleLarge.copy(
@@ -119,6 +122,30 @@ fun DashboardScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = Slate600
                 )
+            }
+
+            // Cloud Status Badge
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (currentUser != null) EmeraldContainer else Slate100
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (currentUser != null) Icons.Default.CloudDone else Icons.Default.CloudSync,
+                        contentDescription = null,
+                        tint = if (currentUser != null) EmeraldDark else Slate600,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (currentUser != null) (if (isBn) "ক্লাউড সিঙ্কড" else "Synced") else (if (isBn) "অফলাইন" else "Offline"),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = if (currentUser != null) EmeraldDark else Slate600
+                    )
+                }
             }
         }
 
