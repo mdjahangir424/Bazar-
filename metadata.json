@@ -1,0 +1,6 @@
+{
+  "name": "Hisab Khata – Daily Hisab",
+  "description": "Daily grocery expense and outstanding balance (বাকি) management app with reports and PDF export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
