@@ -87,4 +87,42 @@ object BanglaFormatter {
         }
         return sb.toString()
     }
+
+    /**
+     * Get full date in Bengali format e.g. "বৃহস্পতিবার, ২২ অক্টোবর ২০২৬"
+     */
+    fun getFullBanglaDate(isoDate: String = getTodayDhakaIso()): String {
+        return try {
+            val date = LocalDate.parse(isoDate, ISO_FORMATTER)
+            val dayOfWeekBangla = when (date.dayOfWeek) {
+                java.time.DayOfWeek.SATURDAY -> "শনিবার"
+                java.time.DayOfWeek.SUNDAY -> "রবিবার"
+                java.time.DayOfWeek.MONDAY -> "সোমবার"
+                java.time.DayOfWeek.TUESDAY -> "মঙ্গলবার"
+                java.time.DayOfWeek.WEDNESDAY -> "বুধবার"
+                java.time.DayOfWeek.THURSDAY -> "বৃহস্পতিবার"
+                java.time.DayOfWeek.FRIDAY -> "শুক্রবার"
+            }
+            val monthBangla = when (date.monthValue) {
+                1 -> "জানুয়ারি"
+                2 -> "ফেব্রুয়ারি"
+                3 -> "মার্চ"
+                4 -> "এপ্রিল"
+                5 -> "মে"
+                6 -> "জুন"
+                7 -> "জুলাই"
+                8 -> "আগস্ট"
+                9 -> "সেপ্টেম্বর"
+                10 -> "অক্টোবর"
+                11 -> "নভেম্বর"
+                12 -> "ডিসেম্বর"
+                else -> ""
+            }
+            val dayDigits = toBanglaDigits(date.dayOfMonth.toString())
+            val yearDigits = toBanglaDigits(date.year.toString())
+            "$dayOfWeekBangla, $dayDigits $monthBangla $yearDigits"
+        } catch (e: Exception) {
+            isoDate
+        }
+    }
 }

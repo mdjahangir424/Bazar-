@@ -35,7 +35,8 @@ data class FinancialSummary(
     val thisMonthMarketExpenses: Double = 0.0,
     val todaysOutstanding: Double = 0.0,
     val todaysPayment: Double = 0.0,
-    val todaysEntriesCount: Int = 0
+    val todaysEntriesCount: Int = 0,
+    val totalOutstandingCount: Int = 0
 )
 
 class FinancialViewModel(
@@ -108,7 +109,8 @@ class FinancialViewModel(
             thisMonthMarketExpenses = monthExp,
             todaysOutstanding = todayOut,
             todaysPayment = todayPay,
-            todaysEntriesCount = countToday
+            todaysEntriesCount = countToday,
+            totalOutstandingCount = outList.size
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinancialSummary())
 

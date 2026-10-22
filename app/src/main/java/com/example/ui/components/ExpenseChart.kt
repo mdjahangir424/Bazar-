@@ -80,6 +80,9 @@ fun ExpenseTrendCard(
         if (max <= 0.0) 100.0 else max
     }
 
+    // Total for the 7 days
+    val total7Days = remember(barsData) { barsData.sumOf { it.amount } }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -97,32 +100,53 @@ fun ExpenseTrendCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isBn) "গত ৭ দিনের বাজার খরচের ট্রেন্ড" else "Last 7 Days Market Trend",
+                    text = if (isBn) "গত ৭ দিনের বাজার খরচ" else "Last 7 Days Market Trend",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = if (isBn) "দৈনিক হিসাব" else "Daily View",
-                    style = MaterialTheme.typography.labelSmall,
+                    text = if (isBn) "মোট ${BanglaFormatter.formatCurrency(total7Days, true)}" else "Total ${BanglaFormatter.formatCurrency(total7Days, false)}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                     color = Slate600
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Custom Bar Chart using Canvas
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(130.dp)
+            // Custom Bar Chart with values on top
+            Column(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Canvas(modifier = Modifier.matchParentSize()) {
+                // Amounts above bars
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    for (item in barsData) {
+                        Text(
+                            text = BanglaFormatter.toBanglaDigits(item.amount.toInt().toString()),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            ),
+                            color = Slate600
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(95.dp)
+                ) {
                     val width = size.width
                     val height = size.height
                     val barCount = barsData.size
                     val spacing = width / barCount
                     val barWidth = spacing * 0.42f
-                    val baselineY = height - 20f
+                    val baselineY = height - 2f
 
                     // Draw subtle baseline
                     drawLine(
@@ -135,18 +159,19 @@ fun ExpenseTrendCard(
                     for ((index, item) in barsData.withIndex()) {
                         val centerX = index * spacing + spacing / 2f
                         val left = centerX - barWidth / 2f
-                        val barHeight = ((item.amount / maxAmount) * (baselineY - 24f)).toFloat()
+                        val isToday = index == barCount - 1
+                        val barHeight = ((item.amount / maxAmount) * (baselineY - 10f)).toFloat()
                         val top = baselineY - (if (barHeight < 4f) 4f else barHeight)
 
-                        // Bar gradient
-                        val gradient = Brush.verticalGradient(
-                            colors = listOf(EmeraldLight, EmeraldPrimary),
-                            startY = top,
-                            endY = baselineY
-                        )
+                        // Highlight today with darker emerald, past days with soft mint
+                        val barColor = if (isToday) {
+                            Color(0xFF047857)
+                        } else {
+                            if (item.amount > 0) Color(0xFF6EE7B7) else Slate200
+                        }
 
                         drawRoundRect(
-                            brush = gradient,
+                            color = barColor,
                             topLeft = Offset(left, top),
                             size = Size(barWidth, baselineY - top),
                             cornerRadius = CornerRadius(6f, 6f)
@@ -154,18 +179,23 @@ fun ExpenseTrendCard(
                     }
                 }
 
-                // Day Labels and values under the chart
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Day Labels cleanly spaced below baseline without clipping
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
-                    for (item in barsData) {
+                    for ((index, item) in barsData.withIndex()) {
+                        val isToday = index == barsData.size - 1
+                        val displayLabel = if (isToday) (if (isBn) "আজ" else "Today") else item.dayLabel
                         Text(
-                            text = item.dayLabel,
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                            color = Slate600
+                            text = displayLabel,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 11.sp,
+                                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            color = if (isToday) Color(0xFF047857) else Slate600
                         )
                     }
                 }

@@ -144,7 +144,7 @@ fun MainAppContent(viewModel: FinancialViewModel) {
                     icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Market Expenses") },
                     label = {
                         Text(
-                            text = AppStrings.marketExpense(language),
+                            text = if (language == AppLanguage.BANGLA) "খরচ" else "Expenses",
                             fontSize = 11.sp,
                             fontWeight = if (currentScreen == NavigationScreen.MARKET_EXPENSES) FontWeight.Bold else FontWeight.Normal
                         )
@@ -166,7 +166,7 @@ fun MainAppContent(viewModel: FinancialViewModel) {
                     icon = { Icon(Icons.Default.ReceiptLong, contentDescription = "Outstanding") },
                     label = {
                         Text(
-                            text = AppStrings.outstanding(language),
+                            text = if (language == AppLanguage.BANGLA) "বাকি" else "Due",
                             fontSize = 11.sp,
                             fontWeight = if (currentScreen == NavigationScreen.OUTSTANDING) FontWeight.Bold else FontWeight.Normal
                         )

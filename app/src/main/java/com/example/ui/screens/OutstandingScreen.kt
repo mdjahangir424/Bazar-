@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -238,8 +239,10 @@ fun OutstandingScreen(
                     },
                     text = {
                         Text(
-                            text = if (isBn) "১. বাকি খাতা (Outstanding)" else "1. Outstanding Due",
-                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
+                            text = if (isBn) "১. বাকি খাতা" else "1. Outstanding Due",
+                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 )
@@ -253,8 +256,10 @@ fun OutstandingScreen(
                     },
                     text = {
                         Text(
-                            text = if (isBn) "২. বাকি পরিশোধ (Payments)" else "2. Payments Made",
-                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
+                            text = if (isBn) "২. বাকি পরিশোধ" else "2. Payments Made",
+                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 )
