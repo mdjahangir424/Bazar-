@@ -386,11 +386,7 @@ object PdfReportGenerator {
         textPaint: Paint,
         signerName: String = ""
     ) {
-        val footerText = if (signerName.isNotBlank()) {
-            "হিসাব খাতা | $signerName | পৃষ্ঠা $pageNumber"
-        } else {
-            "হিসাব খাতা | পৃষ্ঠা $pageNumber"
-        }
+        val footerText = "হিসাব খাতা v2.0.0 • সর্বস্বত্ব সংরক্ষিত © 2026 মো: জাহাঙ্গীর আলম (+8801778600028) | পৃষ্ঠা $pageNumber"
         val textBounds = Rect()
         textPaint.getTextBounds(footerText, 0, footerText.length, textBounds)
         val fx = (pageWidth - textBounds.width()) / 2f
@@ -522,6 +518,13 @@ object PdfReportGenerator {
         // Right Signature: Authorized
         canvas.drawLine(sigRight, sigY, sigRight + 140f, sigY, sigLinePaint)
         canvas.drawText(if (isBn) "অনুমোদনকারীর স্বাক্ষর" else "Authorized Signature", sigRight + 10f, sigY + 14f, subPaint)
+
+        // Receipt Footer Credit
+        val receiptFooter = "হিসাব খাতা v2.0.0 • সর্বস্বত্ব সংরক্ষিত © 2026 মো: জাহাঙ্গীর আলম (+8801778600028)"
+        val footBounds = Rect()
+        subPaint.getTextBounds(receiptFooter, 0, receiptFooter.length, footBounds)
+        val rfx = (pageWidth - footBounds.width()) / 2f
+        canvas.drawText(receiptFooter, rfx, pageHeight - margin + 8f, subPaint)
 
         document.finishPage(page)
 

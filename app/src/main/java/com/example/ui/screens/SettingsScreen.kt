@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.HelpOutline
@@ -130,8 +131,10 @@ fun SettingsScreen(
     var showNotificationDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
+    var showDeleteAllConfirmDialog by remember { mutableStateOf(false) }
     var isBackingUp by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
+    var isDeletingAll by remember { mutableStateOf(false) }
     var isSigningIn by remember { mutableStateOf(false) }
 
     // Color definitions that dynamically adapt with perfect contrast in BOTH Dark and Light Mode
@@ -1509,6 +1512,120 @@ fun SettingsScreen(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // ==========================================
+                // DANGER ZONE: CLEAR / DELETE ALL APP DATA
+                // ==========================================
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("delete_all_data_card"),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                    border = BorderStroke(1.dp, Color(0xFFDC2626).copy(alpha = 0.5f))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFDC2626).copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = Color(0xFFEF4444),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isBn) "অ্যাপের সকল ডাটা মুছে ফেলুন" else "Delete All App Data",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFEF4444),
+                                        fontSize = 16.sp
+                                    )
+                                )
+                                Text(
+                                    text = if (isBn) "সতর্কতা: ডিভাইসের সকল বাজার খরচ ও বাকি হিসাব মুছে যাবে" else "Warning: Permanently resets all expenses and dues on device",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = subtextColor,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = Color(0xFFF59E0B),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = if (isBn)
+                                        "সব ডাটা মোছার আগে প্রয়োজনে উপরের 'ক্লাউডে ব্যাকআপ নিন' অপশন দিয়ে ব্যাকআপ রাখুন। ডাটা মুছলে এই ডিভাইস থেকে সকল এন্ট্রি মুছে যাবে।"
+                                    else
+                                        "Please backup your data above before proceeding. Deleting will permanently remove all records from this device.",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = subtextColor,
+                                        fontSize = 11.5.sp,
+                                        lineHeight = 17.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = { showDeleteAllConfirmDialog = true },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFDC2626)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(46.dp)
+                                .testTag("delete_all_data_btn")
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isBn) "সতর্কতার সাথে সকল ডাটা মুছুন" else "Delete All Data (Reset)",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(18.dp))
 
                 // ==========================================
@@ -2316,6 +2433,74 @@ fun SettingsScreen(
                 OutlinedButton(
                     onClick = { showRestoreConfirmDialog = false },
                     enabled = !isRestoring
+                ) {
+                    Text(if (isBn) "বাতিল" else "Cancel", color = subtextColor)
+                }
+            }
+        )
+    }
+
+    // Clear All App Data Confirmation Dialog
+    if (showDeleteAllConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isDeletingAll) showDeleteAllConfirmDialog = false },
+            containerColor = cardContainerBg,
+            titleContentColor = titleColor,
+            textContentColor = titleColor,
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFDC2626),
+                    modifier = Modifier.size(38.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = if (isBn) "সকল ডাটা মুছে ফেলার নিশ্চিতকরণ" else "Confirm Delete All Data",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFDC2626))
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = if (isBn)
+                            "আপনি কি নিশ্চিতভাবে এই ডিভাইসের সমস্ত বাজার খরচ, বাকি হিসাব ও জমার রেকর্ড স্থায়ীভাবে মুছে ফেলতে চান?\n\nসতর্কতা: এই পদক্ষেপটি অপরিবর্তনযোগ্য। তবে আপনি যদি পূর্বে ক্লাউডে ব্যাকআপ নিয়ে থাকেন, তাহলে 'ক্লাউড থেকে রিস্টোর করুন' অপশন ব্যবহার করে পুনরায় ফিরিয়ে আনতে পারবেন।"
+                        else
+                            "Are you sure you want to permanently delete all expenses, outstanding balances, and payment records from this device?\n\nWarning: This action is permanent and cannot be undone unless you previously backed up your data to Google Cloud.",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = subtextColor, lineHeight = 20.sp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isDeletingAll = true
+                        viewModel.clearAllData {
+                            isDeletingAll = false
+                            showDeleteAllConfirmDialog = false
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    if (isBn) "অ্যাপের সকল ডাটা সফলভাবে মুছে ফেলা হয়েছে!"
+                                    else "All app data has been successfully deleted!"
+                                )
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                    enabled = !isDeletingAll
+                ) {
+                    if (isDeletingAll) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(if (isBn) "হ্যাঁ, সবকিছু মুছে ফেলুন" else "Yes, Delete Everything", color = Color.White)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showDeleteAllConfirmDialog = false },
+                    enabled = !isDeletingAll
                 ) {
                     Text(if (isBn) "বাতিল" else "Cancel", color = subtextColor)
                 }

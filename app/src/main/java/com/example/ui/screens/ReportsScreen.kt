@@ -567,6 +567,17 @@ fun ReportsScreen(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(18.dp))
+                androidx.compose.material3.HorizontalDivider(color = Slate200, thickness = 0.8.dp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (isBn) "হিসাব খাতা v2.0.0 • সর্বস্বত্ব সংরক্ষিত © 2026 মো: জাহাঙ্গীর আলম (+8801778600028)" else "Hisab Khata v2.0.0 • All Rights Reserved © 2026 Md Jahangir Alam (+8801778600028)",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = Slate600,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
         }
 

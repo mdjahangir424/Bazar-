@@ -36,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -187,6 +188,14 @@ fun DatePickerField(
                 )
             }
         },
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = EmeraldPrimary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            focusedLabelColor = EmeraldPrimary,
+            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
         modifier = modifier
             .fillMaxWidth()
             .clickable { datePickerDialog.show() },
@@ -307,10 +316,14 @@ fun EditRecordDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
         title = {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
@@ -333,6 +346,14 @@ fun EditRecordDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     isError = errorText != null,
                     supportingText = errorText?.let { { Text(it, color = CrimsonDanger) } },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = EmeraldPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedLabelColor = EmeraldPrimary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -342,6 +363,14 @@ fun EditRecordDialog(
                     value = noteText,
                     onValueChange = { noteText = it },
                     label = { Text(AppStrings.note(language)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = EmeraldPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedLabelColor = EmeraldPrimary,
+                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )

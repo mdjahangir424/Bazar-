@@ -94,11 +94,21 @@ fun DashboardScreen(
     onNavigateToOutstanding: () -> Unit
 ) {
     val language by viewModel.language.collectAsStateWithLifecycle()
+    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val summary by viewModel.summary.collectAsStateWithLifecycle()
     val expenses by viewModel.expenses.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isBn = language == AppLanguage.BANGLA
     val scope = rememberCoroutineScope()
+
+    // Dynamic contrast colors for Dark and Light Mode
+    val cardContainerBg = if (isDarkMode) Color(0xFF131D2E) else Color(0xFFFFFFFF)
+    val cardBorder = if (isDarkMode) Color(0xFF1E2D4A) else Color(0xFFE2E8F0)
+    val textPrimary = if (isDarkMode) Color(0xFFF8FAFC) else Color(0xFF0F172A)
+    val textSecondary = if (isDarkMode) Color(0xFF94A3B8) else Color(0xFF475569)
+    val emeraldDynamic = if (isDarkMode) Color(0xFF34D399) else EmeraldDark
+    val surfaceBadgeBg = if (currentUser != null) (if (isDarkMode) Color(0xFF064E3B) else EmeraldContainer) else (if (isDarkMode) Color(0xFF1E293B) else Slate100)
+    val surfaceBadgeText = if (currentUser != null) (if (isDarkMode) Color(0xFF6EE7B7) else EmeraldDark) else textSecondary
 
     var showAddExpenseDialog by remember { mutableStateOf(false) }
     var showAddOutstandingDialog by remember { mutableStateOf(false) }
@@ -121,20 +131,20 @@ fun DashboardScreen(
                     text = if (isBn) "হিসাব খাতা" else "Hisab Khata",
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.ExtraBold,
-                        color = Navy900
+                        color = textPrimary
                     )
                 )
                 Text(
                     text = BanglaFormatter.getFullBanglaDate(),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Slate600
+                    color = textSecondary
                 )
             }
 
             // Cloud Status Badge
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = if (currentUser != null) EmeraldContainer else Slate100
+                color = surfaceBadgeBg
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -143,14 +153,14 @@ fun DashboardScreen(
                     Icon(
                         imageVector = if (currentUser != null) Icons.Default.CloudDone else Icons.Default.CloudSync,
                         contentDescription = null,
-                        tint = if (currentUser != null) EmeraldDark else Slate600,
+                        tint = surfaceBadgeText,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (currentUser != null) (if (isBn) "সিঙ্ক হয়েছে" else "Synced") else (if (isBn) "অফলাইন" else "Offline"),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = if (currentUser != null) EmeraldDark else Slate600
+                        color = surfaceBadgeText
                     )
                 }
             }
@@ -274,21 +284,22 @@ fun DashboardScreen(
                     .weight(1f)
                     .clickable { onNavigateToExpenses() },
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                border = BorderStroke(1.dp, cardBorder),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
                         text = if (isBn) "এই মাসের বাজার খরচ" else "This Month's Exp.",
                         style = MaterialTheme.typography.labelMedium,
-                        color = Slate600
+                        color = textSecondary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = BanglaFormatter.formatCurrency(summary.thisMonthMarketExpenses, isBn),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            color = EmeraldDark
+                            color = emeraldDynamic
                         )
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -298,7 +309,7 @@ fun DashboardScreen(
                         else
                             "Today ${BanglaFormatter.formatCurrency(summary.todaysMarketExpenses, false)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Slate600
+                        color = textSecondary
                     )
                 }
             }
@@ -307,14 +318,15 @@ fun DashboardScreen(
             Card(
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                border = BorderStroke(1.dp, cardBorder),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
                         text = if (isBn) "আজকের এন্ট্রি" else "Today's Entries",
                         style = MaterialTheme.typography.labelMedium,
-                        color = Slate600
+                        color = textSecondary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -324,7 +336,7 @@ fun DashboardScreen(
                             "${summary.todaysEntriesCount}",
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            color = Navy900
+                            color = textPrimary
                         )
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -334,7 +346,7 @@ fun DashboardScreen(
                         else
                             "New Due ${BanglaFormatter.formatCurrency(summary.todaysOutstanding, false)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Slate600
+                        color = textSecondary
                     )
                 }
             }
@@ -346,7 +358,7 @@ fun DashboardScreen(
         Text(
             text = if (isBn) "দ্রুত হিসাব এন্ট্রি" else "Quick Entry Actions",
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = Navy800
+            color = textPrimary
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -481,7 +493,8 @@ fun DashboardScreen(
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+            border = BorderStroke(1.dp, cardBorder),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
@@ -493,13 +506,13 @@ fun DashboardScreen(
                     Text(
                         text = if (isBn) "সাম্প্রতিক খরচ" else "Recent Expenses",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = Navy900
+                        color = textPrimary
                     )
                     Text(
                         text = if (isBn) "সব দেখুন" else "View All",
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            color = EmeraldDark
+                            color = emeraldDynamic
                         ),
                         modifier = Modifier.clickable { onNavigateToExpenses() }
                     )
@@ -512,21 +525,21 @@ fun DashboardScreen(
                     Text(
                         text = if (isBn) "এখনো কোনো খরচ রেকর্ড করা হয়নি" else "No recent expense records",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate600,
+                        color = textSecondary,
                         modifier = Modifier.padding(vertical = 12.dp)
                     )
                 } else {
                     recentList.forEachIndexed { index, exp ->
                         if (index > 0) {
                             Spacer(modifier = Modifier.height(10.dp))
-                            HorizontalDivider(color = Slate100, thickness = 1.dp)
+                            HorizontalDivider(color = cardBorder, thickness = 1.dp)
                             Spacer(modifier = Modifier.height(10.dp))
                         }
 
                         val isBill = exp.note.contains("বিল") || exp.note.contains("বিদ্যুৎ") || exp.note.contains("গ্যাস") || exp.note.contains("পানি")
                         val isTravel = exp.note.contains("যাতায়াত") || exp.note.contains("ভাড়া") || exp.note.contains("গাড়ি")
                         val iconColor = if (isBill) Color(0xFF3B82F6) else if (isTravel) Color(0xFF10B981) else Color(0xFFF59E0B)
-                        val iconBg = if (isBill) Color(0xFFEFF6FF) else if (isTravel) Color(0xFFECFDF5) else Color(0xFFFEF3C7)
+                        val iconBg = if (isDarkMode) Color(0xFF1E293B) else (if (isBill) Color(0xFFEFF6FF) else if (isTravel) Color(0xFFECFDF5) else Color(0xFFFEF3C7))
                         val categoryName = if (isBill) "বিল" else if (isTravel) "যাতায়াত" else "খাবার"
 
                         Row(
@@ -557,12 +570,12 @@ fun DashboardScreen(
                                     Text(
                                         text = if (exp.note.isNotBlank()) exp.note else (if (isBn) "বাজার খরচ" else "Expense"),
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = Navy900
+                                        color = textPrimary
                                     )
                                     Text(
                                         text = "${BanglaFormatter.formatToDisplayDate(exp.date, isBn)} · $categoryName",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = Slate600
+                                        color = textSecondary
                                     )
                                 }
                             }
@@ -570,7 +583,7 @@ fun DashboardScreen(
                                 text = BanglaFormatter.formatCurrency(exp.amount, isBn),
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = EmeraldDark
+                                    color = emeraldDynamic
                                 )
                             )
                         }
