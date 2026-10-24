@@ -239,7 +239,7 @@ fun OutstandingScreen(
                     },
                     text = {
                         Text(
-                            text = if (isBn) "১. বাকি খাতা" else "1. Outstanding Due",
+                            text = if (isBn) "বাকি খাতা" else "Outstanding Due",
                             fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -256,7 +256,7 @@ fun OutstandingScreen(
                     },
                     text = {
                         Text(
-                            text = if (isBn) "২. বাকি পরিশোধ" else "2. Payments Made",
+                            text = if (isBn) "পরিশোধ" else "Payments Made",
                             fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
