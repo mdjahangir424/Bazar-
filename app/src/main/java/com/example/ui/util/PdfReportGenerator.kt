@@ -349,12 +349,6 @@ object PdfReportGenerator {
 
         canvas.drawLine(sigLeft, y, sigLeft + 160f, y, sigLinePaint)
         canvas.drawText(if (isBn) "স্বাক্ষর: $signerName" else "Signature: $signerName", sigLeft + 5f, y + 14f, subHeaderPaint)
-        if (signerEmail.isNotBlank()) {
-            canvas.drawText(if (isBn) "গুগল ক্লাউড আইডি: $signerEmail" else "Google Cloud ID: $signerEmail", sigLeft + 5f, y + 26f, subHeaderPaint)
-            canvas.drawText(if (isBn) "প্রস্তুতকারক (Google Cloud Login)" else "Prepared by (Google Cloud)", sigLeft + 5f, y + 38f, subHeaderPaint)
-        } else {
-            canvas.drawText(if (isBn) "প্রস্তুতকারক (হিসাব খাতা)" else "Prepared by", sigLeft + 5f, y + 26f, subHeaderPaint)
-        }
 
         canvas.drawLine(sigRight, y, sigRight + 130f, y, sigLinePaint)
         canvas.drawText(if (isBn) "অনুমোদনকারীর স্বাক্ষর" else "Authorized Signature", sigRight + 10f, y + 14f, subHeaderPaint)
@@ -393,7 +387,7 @@ object PdfReportGenerator {
         signerName: String = ""
     ) {
         val footerText = if (signerName.isNotBlank()) {
-            "হিসাব খাতা | প্রস্তুতকারী (Google Cloud): $signerName | পৃষ্ঠা $pageNumber"
+            "হিসাব খাতা | $signerName | পৃষ্ঠা $pageNumber"
         } else {
             "হিসাব খাতা | পৃষ্ঠা $pageNumber"
         }
@@ -524,12 +518,6 @@ object PdfReportGenerator {
         // Left Signature: Logged-in Google Cloud user
         canvas.drawLine(sigLeft, sigY, sigLeft + 160f, sigY, sigLinePaint)
         canvas.drawText(if (isBn) "স্বাক্ষর: $signerName" else "Signature: $signerName", sigLeft + 5f, sigY + 14f, subPaint)
-        if (signerEmail.isNotBlank()) {
-            canvas.drawText(if (isBn) "গুগল ক্লাউড আইডি: $signerEmail" else "Google Cloud ID: $signerEmail", sigLeft + 5f, sigY + 26f, subPaint)
-            canvas.drawText(if (isBn) "আদায়কারী / প্রস্তুতকারক" else "Prepared by (Google Cloud)", sigLeft + 5f, sigY + 38f, subPaint)
-        } else {
-            canvas.drawText(if (isBn) "আদায়কারী / প্রস্তুতকারক" else "Prepared by", sigLeft + 5f, sigY + 26f, subPaint)
-        }
 
         // Right Signature: Authorized
         canvas.drawLine(sigRight, sigY, sigRight + 140f, sigY, sigLinePaint)

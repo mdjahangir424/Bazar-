@@ -87,7 +87,8 @@ class MainActivity : ComponentActivity() {
         viewModel = ViewModelProvider(this, factory)[FinancialViewModel::class.java]
 
         setContent {
-            MyApplicationTheme {
+            val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
+            MyApplicationTheme(darkTheme = isDarkMode) {
                 MainAppContent(viewModel = viewModel)
             }
         }

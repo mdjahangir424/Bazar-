@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -69,6 +70,7 @@ import com.example.ui.theme.Slate100
 import com.example.ui.theme.Slate200
 import com.example.ui.theme.Slate300
 import com.example.ui.theme.Slate600
+import com.example.ui.theme.Slate700
 import com.example.ui.util.AppLanguage
 import com.example.ui.util.AppStrings
 import com.example.ui.util.BanglaFormatter
@@ -200,6 +202,43 @@ fun MarketExpensesScreen(
                             .testTag("expense_note_input"),
                         shape = RoundedCornerShape(12.dp)
                     )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Quick Category Chips (খাবার, বিল, যাতায়াত, অন্যান্য)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("খাবার", "বিল", "যাতায়াত", "অন্যান্য").forEach { cat ->
+                            val isSelected = inputNote.contains(cat)
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) EmeraldContainer else Slate100,
+                                border = BorderStroke(1.dp, if (isSelected) EmeraldPrimary else Slate300),
+                                onClick = {
+                                    inputNote = if (inputNote.isBlank()) {
+                                        cat
+                                    } else if (inputNote.contains(cat)) {
+                                        inputNote.replace(", $cat", "").replace(cat, "").trim()
+                                    } else {
+                                        "$inputNote, $cat"
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    text = cat,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    ),
+                                    color = if (isSelected) EmeraldDark else Slate700
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 

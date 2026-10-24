@@ -51,6 +51,15 @@ class FinancialViewModel(
     private val _allowNegativeBalance = MutableStateFlow(false)
     val allowNegativeBalance: StateFlow<Boolean> = _allowNegativeBalance.asStateFlow()
 
+    private val _isDarkMode = MutableStateFlow(true)
+    val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
+
+    private val _reminderEnabled = MutableStateFlow(true)
+    val reminderEnabled: StateFlow<Boolean> = _reminderEnabled.asStateFlow()
+
+    private val _reminderTime = MutableStateFlow("09:00 PM")
+    val reminderTime: StateFlow<String> = _reminderTime.asStateFlow()
+
     val currentUser: StateFlow<FirebaseUser?> = authManager?.currentUser
         ?: MutableStateFlow(null).asStateFlow()
 
@@ -120,6 +129,22 @@ class FinancialViewModel(
 
     fun toggleLanguage() {
         _language.value = if (_language.value == AppLanguage.BANGLA) AppLanguage.ENGLISH else AppLanguage.BANGLA
+    }
+
+    fun toggleDarkMode() {
+        _isDarkMode.value = !_isDarkMode.value
+    }
+
+    fun setDarkMode(dark: Boolean) {
+        _isDarkMode.value = dark
+    }
+
+    fun setReminderEnabled(enabled: Boolean) {
+        _reminderEnabled.value = enabled
+    }
+
+    fun setReminderTime(time: String) {
+        _reminderTime.value = time
     }
 
     fun setAllowNegativeBalance(allow: Boolean) {

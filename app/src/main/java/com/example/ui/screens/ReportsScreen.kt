@@ -549,24 +549,6 @@ fun ReportsScreen(
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = Navy900
                         )
-                        if (signerEmail.isNotBlank()) {
-                            Text(
-                                text = if (isBn) "গুগল ক্লাউড আইডি: $signerEmail" else "Google Cloud ID: $signerEmail",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Slate600
-                            )
-                            Text(
-                                text = if (isBn) "প্রস্তুতকারক (Google Cloud Login)" else "Prepared by (Google Cloud)",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                                color = EmeraldDark
-                            )
-                        } else {
-                            Text(
-                                text = if (isBn) "প্রস্তুতকারক (হিসাব খাতা)" else "Prepared by",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Slate600
-                            )
-                        }
                     }
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
