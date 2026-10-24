@@ -195,11 +195,42 @@ class FinancialViewModel(
         authManager?.signOut(viewModelScope, onComplete) ?: onComplete()
     }
 
+    private val _lastCloudBackupTime = MutableStateFlow<String?>(null)
+    val lastCloudBackupTime: StateFlow<String?> = _lastCloudBackupTime.asStateFlow()
+
+    fun backupAllToCloud(onResult: (Result<String>) -> Unit) {
+        val uid = authManager?.currentUser?.value?.uid
+        if (uid != null && syncManager != null) {
+            viewModelScope.launch {
+                val res = syncManager.backupAllToCloud(
+                    userId = uid,
+                    expenses = expenses.value,
+                    outstanding = outstanding.value,
+                    payments = payments.value
+                )
+                if (res.isSuccess) {
+                    _lastCloudBackupTime.value = res.getOrNull()
+                }
+                onResult(res)
+            }
+        } else {
+            onResult(Result.failure(IllegalStateException("দয়া করে আগে গুগল একাউন্টে সাইন ইন করুন (Please sign in first)")))
+        }
+    }
+
+    fun restoreFromCloud(onResult: (Result<Int>) -> Unit) {
+        syncFromCloud(onResult)
+    }
+
     fun syncFromCloud(onResult: (Result<Int>) -> Unit) {
         val uid = authManager?.currentUser?.value?.uid
         if (uid != null && syncManager != null) {
             viewModelScope.launch {
                 val res = syncManager.syncDownFromCloud(uid)
+                val metaRes = syncManager.getLatestBackupMetadata(uid)
+                if (metaRes.isSuccess) {
+                    _lastCloudBackupTime.value = metaRes.getOrNull()?.get("backupTime") as? String
+                }
                 onResult(res)
             }
         } else {

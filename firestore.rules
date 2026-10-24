@@ -31,6 +31,14 @@ service cloud.firestore {
              data.amount > 0;
     }
 
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /users/{userId}/backup_metadata/{metadataId} {
+      allow read, write: if isOwner(userId);
+    }
+
     match /users/{userId}/market_expenses/{expenseId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && isValidExpense(request.resource.data);

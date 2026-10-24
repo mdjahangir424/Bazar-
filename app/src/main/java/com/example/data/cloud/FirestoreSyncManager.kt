@@ -211,4 +211,95 @@ class FirestoreSyncManager(
             Log.e("FirestoreSync", "Error deleting payment from cloud", e)
         }
     }
+
+    /**
+     * Complete cloud-based backup feature using Firebase Firestore.
+     * Backs up all grocery expenses, outstanding balances, payments, and metadata.
+     */
+    suspend fun backupAllToCloud(
+        userId: String,
+        expenses: List<MarketExpense>,
+        outstanding: List<OutstandingEntry>,
+        payments: List<PaymentRecord>
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val userDoc = firestore.collection("users").document(userId)
+
+            // 1. Upload all grocery expenses
+            for (item in expenses) {
+                val data = hashMapOf(
+                    "userId" to userId,
+                    "serialNo" to item.serialNo,
+                    "date" to item.date,
+                    "amount" to item.amount,
+                    "note" to item.note,
+                    "createdAt" to item.createdAt
+                )
+                userDoc.collection("market_expenses").document(item.id.toString()).set(data).await()
+            }
+
+            // 2. Upload all outstanding dues
+            for (item in outstanding) {
+                val data = hashMapOf(
+                    "userId" to userId,
+                    "serialNo" to item.serialNo,
+                    "date" to item.date,
+                    "amount" to item.amount,
+                    "note" to item.note,
+                    "createdAt" to item.createdAt
+                )
+                userDoc.collection("outstanding_entries").document(item.id.toString()).set(data).await()
+            }
+
+            // 3. Upload all payments
+            for (item in payments) {
+                val data = hashMapOf(
+                    "userId" to userId,
+                    "serialNo" to item.serialNo,
+                    "date" to item.date,
+                    "amount" to item.amount,
+                    "note" to item.note,
+                    "createdAt" to item.createdAt
+                )
+                userDoc.collection("payment_records").document(item.id.toString()).set(data).await()
+            }
+
+            // 4. Record Backup Metadata
+            val backupTime = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault()).format(java.util.Date())
+            val metadata = hashMapOf(
+                "userId" to userId,
+                "backupTime" to backupTime,
+                "timestamp" to System.currentTimeMillis(),
+                "expensesCount" to expenses.size,
+                "outstandingCount" to outstanding.size,
+                "paymentsCount" to payments.size,
+                "totalExpenses" to expenses.sumOf { it.amount },
+                "netBalance" to (outstanding.sumOf { it.amount } - payments.sumOf { it.amount })
+            )
+            userDoc.collection("backup_metadata").document("latest").set(metadata).await()
+
+            Result.success(backupTime)
+        } catch (e: Exception) {
+            Log.e("FirestoreSync", "Error backing up to cloud", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Retrieve the latest cloud backup metadata
+     */
+    suspend fun getLatestBackupMetadata(userId: String): Result<Map<String, Any>?> = withContext(Dispatchers.IO) {
+        try {
+            val doc = firestore.collection("users").document(userId)
+                .collection("backup_metadata").document("latest").get().await()
+            if (doc.exists()) {
+                Result.success(doc.data)
+            } else {
+                Result.success(null)
+            }
+        } catch (e: Exception) {
+            Log.e("FirestoreSync", "Error fetching backup metadata", e)
+            Result.failure(e)
+        }
+    }
 }

@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -26,28 +27,38 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Policy
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -97,21 +108,31 @@ fun SettingsScreen(
     snackbarHostState: SnackbarHostState
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
     val language by viewModel.language.collectAsStateWithLifecycle()
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
     val reminderEnabled by viewModel.reminderEnabled.collectAsStateWithLifecycle()
     val reminderTime by viewModel.reminderTime.collectAsStateWithLifecycle()
+    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
+    val lastCloudBackupTime by viewModel.lastCloudBackupTime.collectAsStateWithLifecycle()
+    val expensesList by viewModel.expenses.collectAsStateWithLifecycle()
+    val outstandingList by viewModel.outstanding.collectAsStateWithLifecycle()
+    val paymentsList by viewModel.payments.collectAsStateWithLifecycle()
     val isBn = language == AppLanguage.BANGLA
     val scope = rememberCoroutineScope()
 
     var currentSubScreen by remember { mutableStateOf(SettingsSubScreen.MAIN) }
 
-    // Dialog control states for quick options
+    // Dialog & loading states for cloud and options
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showNotificationDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var showRestoreConfirmDialog by remember { mutableStateOf(false) }
+    var isBackingUp by remember { mutableStateOf(false) }
+    var isRestoring by remember { mutableStateOf(false) }
+    var isSigningIn by remember { mutableStateOf(false) }
 
     // Color definitions that dynamically adapt with perfect contrast in BOTH Dark and Light Mode
     val pageBg = if (isDarkMode) Color(0xFF0B1320) else Color(0xFFF8FAFC)
@@ -1040,6 +1061,457 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 // ==========================================
+                // CLOUD BACKUP & RESTORE CARD (FIRESTORE)
+                // ==========================================
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("cloud_backup_restore_card"),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        // Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(cyanContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudSync,
+                                    contentDescription = null,
+                                    tint = cyanAccent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isBn) "ক্লাউড ব্যাকআপ ও রিস্টোর" else "Cloud Backup & Restore",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = titleColor,
+                                        fontSize = 16.sp
+                                    )
+                                )
+                                Text(
+                                    text = if (isBn) "নতুন ফোনে ডাটা ফিরিয়ে আনতে গুগল ক্লাউড ব্যাকআপ" else "Google Firestore sync to restore data on new devices",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = subtextColor,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        if (currentUser == null) {
+                            // User is NOT signed in
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = cardItemBg,
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.CloudUpload,
+                                            contentDescription = null,
+                                            tint = cyanAccent,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = if (isBn) "গুগল ক্লাউড সিঙ্ক সক্রিয় করুন" else "Enable Google Cloud Sync",
+                                            style = MaterialTheme.typography.titleSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = titleColor
+                                            )
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = if (isBn)
+                                            "আপনার বাজার খরচ, বাকি হিসাব ও জমার সমস্ত রেকর্ড যাতে নতুন ডিভাইসে বা ফোন পরিবর্তন করলেও স্বয়ংক্রিয়ভাবে ফিরে পান, সেজন্য আপনার গুগল একাউন্টে সাইন ইন করুন।"
+                                        else
+                                            "Sign in with your Google account to back up and restore your grocery expenses and outstanding balances seamlessly across devices.",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = subtextColor,
+                                            lineHeight = 18.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    Button(
+                                        onClick = {
+                                            if (activity != null) {
+                                                isSigningIn = true
+                                                viewModel.signInWithGoogle(
+                                                    activity = activity,
+                                                    onSuccess = { user ->
+                                                        isSigningIn = false
+                                                        scope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                if (isBn) "গুগল একাউন্টে সফলভাবে সংযুক্ত হয়েছে!" else "Connected to Google account!"
+                                                            )
+                                                        }
+                                                    },
+                                                    onError = { err ->
+                                                        isSigningIn = false
+                                                        scope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                if (isBn) "সাইন ইন ব্যর্থ: $err" else "Sign-in failed: $err"
+                                                            )
+                                                        }
+                                                    },
+                                                    onCancelled = {
+                                                        isSigningIn = false
+                                                    }
+                                                )
+                                            } else {
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        if (isBn) "অ্যাক্টিভিটি উপলব্ধ নয়" else "Activity not available"
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(46.dp)
+                                            .testTag("google_signin_button"),
+                                        enabled = !isSigningIn
+                                    ) {
+                                        if (isSigningIn) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                color = Color.White,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        } else {
+                                            Icon(
+                                                Icons.Default.AccountCircle,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
+                                        Text(
+                                            text = if (isBn) "গুগল সাইন ইন ও ক্লাউড সিঙ্ক" else "Sign In with Google",
+                                            style = MaterialTheme.typography.titleSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            // User IS signed in
+                            // 1. Account info banner
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                color = cardItemBg,
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(EmeraldContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.AccountCircle,
+                                            contentDescription = null,
+                                            tint = EmeraldDark,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(10.dp))
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = currentUser?.displayName ?: (if (isBn) "গুগল ব্যবহারকারী" else "Google User"),
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = titleColor
+                                                ),
+                                                maxLines = 1
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Icon(
+                                                Icons.Default.CheckCircle,
+                                                contentDescription = null,
+                                                tint = EmeraldPrimary,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = currentUser?.email ?: "",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = subtextColor,
+                                                fontSize = 11.5.sp
+                                            ),
+                                            maxLines = 1
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.signOut {
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        if (isBn) "গুগল একাউন্ট থেকে সাইন আউট সম্পন্ন" else "Signed out of Google account"
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Logout,
+                                            contentDescription = "Sign Out",
+                                            tint = subtextColor,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // 2. Status & Statistics Box
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                color = cardItemBg,
+                                border = BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = if (lastCloudBackupTime != null) Icons.Default.CloudDone else Icons.Default.Warning,
+                                                contentDescription = null,
+                                                tint = if (lastCloudBackupTime != null) EmeraldPrimary else Color(0xFFF59E0B),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = if (isBn) "সর্বশেষ ক্লাউড ব্যাকআপ:" else "Last Cloud Backup:",
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = titleColor
+                                                )
+                                            )
+                                        }
+
+                                        Text(
+                                            text = lastCloudBackupTime ?: (if (isBn) "নেওয়া হয়নি" else "Not yet"),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                color = if (lastCloudBackupTime != null) cyanChevron else Color(0xFFF59E0B),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    HorizontalDivider(color = cardBorder)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Data Stats
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceAround
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = "${expensesList.size}",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = cyanAccent
+                                                )
+                                            )
+                                            Text(
+                                                text = if (isBn) "বাজার খরচ" else "Expenses",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    color = subtextColor,
+                                                    fontSize = 11.sp
+                                                )
+                                            )
+                                        }
+
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = "${outstandingList.size}",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color(0xFFF59E0B)
+                                                )
+                                            )
+                                            Text(
+                                                text = if (isBn) "বাকি হিসাব" else "Outstanding",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    color = subtextColor,
+                                                    fontSize = 11.sp
+                                                )
+                                            )
+                                        }
+
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = "${paymentsList.size}",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = EmeraldPrimary
+                                                )
+                                            )
+                                            Text(
+                                                text = if (isBn) "পরিশোধ" else "Payments",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    color = subtextColor,
+                                                    fontSize = 11.sp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // 3. Backup and Restore Buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                // Backup Now Button
+                                Button(
+                                    onClick = {
+                                        isBackingUp = true
+                                        viewModel.backupAllToCloud { result ->
+                                            isBackingUp = false
+                                            result.onSuccess { timeStr ->
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        if (isBn) "ক্লাউডে সফলভাবে ব্যাকআপ সম্পন্ন হয়েছে! ($timeStr)"
+                                                        else "Successfully backed up to Google Cloud! ($timeStr)"
+                                                    )
+                                                }
+                                            }.onFailure { ex ->
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        if (isBn) "ব্যাকআপ ব্যর্থ: ${ex.message}"
+                                                        else "Backup failed: ${ex.message}"
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .testTag("backup_now_button"),
+                                    enabled = !isBackingUp && !isRestoring
+                                ) {
+                                    if (isBackingUp) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            color = Color.White,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    } else {
+                                        Icon(
+                                            Icons.Default.CloudUpload,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    Text(
+                                        text = if (isBn) "ব্যাকআপ নিন" else "Backup Now",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    )
+                                }
+
+                                // Restore from Cloud Button
+                                Button(
+                                    onClick = { showRestoreConfirmDialog = true },
+                                    colors = ButtonDefaults.buttonColors(containerColor = cyanAccent),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .testTag("restore_from_cloud_button"),
+                                    enabled = !isBackingUp && !isRestoring
+                                ) {
+                                    if (isRestoring) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            color = Color(0xFF0F172A),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    } else {
+                                        Icon(
+                                            Icons.Default.CloudDownload,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = Color(0xFF0F172A)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    Text(
+                                        text = if (isBn) "রিস্টোর করুন" else "Restore Data",
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF0F172A)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // ==========================================
                 // 2. SECTION CARD: App Preferences
                 // ==========================================
                 Card(
@@ -1759,6 +2231,93 @@ fun SettingsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = cyanContainer)
                 ) {
                     Text(if (isBn) "বন্ধ করুন" else "Close", color = cyanAccent)
+                }
+            }
+        )
+    }
+
+    // Cloud Restore Confirmation Dialog
+    if (showRestoreConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isRestoring) showRestoreConfirmDialog = false },
+            containerColor = cardContainerBg,
+            titleContentColor = titleColor,
+            textContentColor = titleColor,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CloudDownload, contentDescription = null, tint = cyanAccent)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = if (isBn) "ক্লাউড থেকে ডাটা রিস্টোর করবেন?" else "Restore Cloud Data?",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = titleColor)
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = if (isBn)
+                            "গুগল ক্লাউড ফায়ারবেসে সংরক্ষিত আপনার সকল বাজার খরচ, বাকি ও জমার হিসাব এই ডিভাইসে নামিয়ে আনা (রিস্টোর) হবে। এতে কোনো বিদ্যমান ডাটা মুছে যাবে না, বরং ক্লাউডের সব রেকর্ড ডিভাইসে আপডেট ও সিঙ্ক হবে।"
+                        else
+                            "All grocery expenses, outstanding balances, and payment records saved in your Google Cloud account will be synchronized to this device.",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = subtextColor, lineHeight = 20.sp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    if (lastCloudBackupTime != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = cardItemBg,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = if (isBn) "সর্বশেষ ব্যাকআপের সময়: $lastCloudBackupTime" else "Latest cloud backup: $lastCloudBackupTime",
+                                modifier = Modifier.padding(10.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(color = cyanChevron, fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isRestoring = true
+                        viewModel.restoreFromCloud { result ->
+                            isRestoring = false
+                            showRestoreConfirmDialog = false
+                            result.onSuccess { count ->
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (isBn) "ক্লাউড থেকে সফলভাবে $count টি রেকর্ড রিস্টোর করা হয়েছে!"
+                                        else "Successfully restored $count records from cloud!"
+                                    )
+                                }
+                            }.onFailure { ex ->
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (isBn) "রিস্টোর ব্যর্থ: ${ex.message}"
+                                        else "Restore failed: ${ex.message}"
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                    enabled = !isRestoring
+                ) {
+                    if (isRestoring) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(if (isBn) "হ্যাঁ, রিস্টোর করুন" else "Yes, Restore", color = Color.White)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showRestoreConfirmDialog = false },
+                    enabled = !isRestoring
+                ) {
+                    Text(if (isBn) "বাতিল" else "Cancel", color = subtextColor)
                 }
             }
         )
