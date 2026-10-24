@@ -39,11 +39,21 @@ data class FinancialSummary(
     val totalOutstandingCount: Int = 0
 )
 
+data class UserProfile(
+    val name: String = "মো: জাহাঙ্গীর আলম (Md Jahangir Alam)",
+    val phone: String = "+8801778600028",
+    val email: String = "mdjahangiralam2528@gmail.com",
+    val gender: String = "ছেলে" // "ছেলে" or "মেয়ে"
+)
+
 class FinancialViewModel(
     private val repository: FinancialRepository,
     private val authManager: AuthManager? = null,
     private val syncManager: FirestoreSyncManager? = null
 ) : ViewModel() {
+
+    private val _userProfile = MutableStateFlow(UserProfile())
+    val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
 
     private val _language = MutableStateFlow(AppLanguage.BANGLA)
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
@@ -122,6 +132,15 @@ class FinancialViewModel(
             totalOutstandingCount = outList.size
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinancialSummary())
+
+    fun updateProfile(name: String, phone: String, email: String, gender: String) {
+        _userProfile.value = UserProfile(
+            name = name.ifBlank { "মো: জাহাঙ্গীর আলম (Md Jahangir Alam)" },
+            phone = phone.ifBlank { "+8801778600028" },
+            email = email.ifBlank { "mdjahangiralam2528@gmail.com" },
+            gender = gender
+        )
+    }
 
     fun setLanguage(lang: AppLanguage) {
         _language.value = lang

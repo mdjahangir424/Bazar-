@@ -88,11 +88,12 @@ fun ReportsScreen(
     val isBn = language == AppLanguage.BANGLA
     val scope = rememberCoroutineScope()
 
-    // Google Cloud Logged-in user information for report & receipt signature
-    val signerName = currentUser?.displayName?.takeIf { it.isNotBlank() }
-        ?: currentUser?.email?.substringBefore("@")
+    // Profile user information for report & receipt signature
+    val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
+    val signerName = userProfile.name.takeIf { it.isNotBlank() }
+        ?: currentUser?.displayName?.takeIf { it.isNotBlank() }
         ?: (if (isBn) "মো: জাহাঙ্গীর আলম" else "Md Jahangir Alam")
-    val signerEmail = currentUser?.email ?: "mdjahangiralam2528@gmail.com"
+    val signerEmail = userProfile.email.ifBlank { currentUser?.email ?: "mdjahangiralam2528@gmail.com" }
 
     var selectedReportType by remember { mutableStateOf(ReportType.ALL) }
     var selectedPeriod by remember { mutableStateOf(ReportPeriod.THIS_MONTH) }

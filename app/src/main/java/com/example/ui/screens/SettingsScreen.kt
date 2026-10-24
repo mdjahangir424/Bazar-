@@ -1,10 +1,8 @@
 package com.example.ui.screens
 
-import android.app.Activity
 import android.content.Intent
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,28 +21,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Face
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Policy
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -56,6 +54,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -71,26 +70,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ui.theme.CrimsonDanger
 import com.example.ui.theme.EmeraldContainer
 import com.example.ui.theme.EmeraldDark
 import com.example.ui.theme.EmeraldPrimary
-import com.example.ui.theme.Slate100
-import com.example.ui.theme.Slate600
-import com.example.ui.theme.Slate700
 import com.example.ui.util.AppLanguage
 import com.example.ui.viewmodel.FinancialViewModel
 import kotlinx.coroutines.launch
-import java.io.BufferedReader
-import java.io.InputStreamReader
+
+enum class SettingsSubScreen {
+    MAIN,
+    PROFILE,
+    HELP_AND_SUPPORT,
+    PRIVACY_POLICY
+}
 
 @Composable
 fun SettingsScreen(
@@ -100,801 +99,1322 @@ fun SettingsScreen(
     val context = LocalContext.current
     val language by viewModel.language.collectAsStateWithLifecycle()
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
+    val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
     val reminderEnabled by viewModel.reminderEnabled.collectAsStateWithLifecycle()
     val reminderTime by viewModel.reminderTime.collectAsStateWithLifecycle()
-    val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
     val isBn = language == AppLanguage.BANGLA
     val scope = rememberCoroutineScope()
 
-    // Dialog control states
-    var showProfileDialog by remember { mutableStateOf(false) }
+    var currentSubScreen by remember { mutableStateOf(SettingsSubScreen.MAIN) }
+
+    // Dialog control states for quick options
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
-    var showReminderDialog by remember { mutableStateOf(false) }
+    var showNotificationDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
 
-    var showClearDataDialog by remember { mutableStateOf(false) }
-    var confirmText by remember { mutableStateOf("") }
-    var showRestoreConfirmDialog by remember { mutableStateOf(false) }
-    var pendingRestoreJson by remember { mutableStateOf<String?>(null) }
+    // Color definitions that dynamically adapt with perfect contrast in BOTH Dark and Light Mode
+    val pageBg = if (isDarkMode) Color(0xFF0B1320) else Color(0xFFF8FAFC)
+    val cardContainerBg = if (isDarkMode) Color(0xFF131D2E) else Color(0xFFFFFFFF)
+    val cardItemBg = if (isDarkMode) Color(0xFF18253B) else Color(0xFFF1F5F9)
+    val cardBorder = if (isDarkMode) Color(0xFF1E2D4A) else Color(0xFFE2E8F0)
+    val titleColor = if (isDarkMode) Color.White else Color(0xFF0F172A)
+    val subtextColor = if (isDarkMode) Color(0xFF94A3B8) else Color(0xFF475569)
+    val cyanContainer = if (isDarkMode) Color(0xFF0E384D) else Color(0xFFE0F2FE)
+    val cyanAccent = if (isDarkMode) Color(0xFF22D3EE) else Color(0xFF0284C7)
+    val cyanChevron = if (isDarkMode) Color(0xFF38BDF8) else Color(0xFF0284C7)
+    val darkBlueIconContainer = if (isDarkMode) Color(0xFF142136) else Color(0xFFE2E8F0)
 
-    // File Picker for JSON Restore
-    val restoreFilePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val reader = BufferedReader(InputStreamReader(inputStream))
-                val content = reader.readText()
-                reader.close()
-                pendingRestoreJson = content
-                showRestoreConfirmDialog = true
-            } catch (e: Exception) {
-                scope.launch {
-                    snackbarHostState.showSnackbar("Failed to read file: ${e.message}")
-                }
-            }
+    // Handle system back button when inside sub-screens
+    if (currentSubScreen != SettingsSubScreen.MAIN) {
+        BackHandler {
+            currentSubScreen = SettingsSubScreen.MAIN
         }
     }
 
-    // Color constants precisely tuned to match user's screenshot
-    val pageBg = Color(0xFF0B1320)
-    val cardContainerBg = Color(0xFF131D2E)
-    val cardItemBg = Color(0xFF18253B)
-    val cardBorder = Color(0xFF1E2D4A)
-    val cyanContainer = Color(0xFF0E384D)
-    val cyanAccent = Color(0xFF22D3EE)
-    val cyanChevron = Color(0xFF38BDF8)
-    val slateSubtext = Color(0xFF94A3B8)
-    val darkBlueIconContainer = Color(0xFF142136)
+    when (currentSubScreen) {
+        // ==========================================
+        // SUB-SCREEN 1: PROFILE DEDICATED PAGE
+        // ==========================================
+        SettingsSubScreen.PROFILE -> {
+            var profileName by remember(userProfile) { mutableStateOf(userProfile.name) }
+            var profilePhone by remember(userProfile) { mutableStateOf(userProfile.phone) }
+            var profileEmail by remember(userProfile) { mutableStateOf(userProfile.email) }
+            var profileGender by remember(userProfile) { mutableStateOf(userProfile.gender) }
+            var nameError by remember { mutableStateOf<String?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(pageBg)
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-            .testTag("settings_screen_root")
-    ) {
-        // TOP HEADER: Circular Cyan Settings Icon + Title & Subtitle
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp, bottom = 22.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Cyan circular icon badge
-            Box(
+            Column(
                 modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(cyanContainer)
-                    .border(BorderStroke(1.5.dp, Color(0xFF0284C7).copy(alpha = 0.45f)), CircleShape),
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .background(pageBg)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+                    .testTag("profile_page_root")
             ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = null,
-                    tint = cyanAccent,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Column {
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        fontSize = 26.sp
-                    )
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Manage your profile, language and app preferences",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        color = slateSubtext,
-                        fontSize = 13.sp
-                    )
-                )
-            }
-        }
-
-        // ==========================================
-        // 1. SECTION CARD: Settings (Profile & Language)
-        // ==========================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
-            colors = CardDefaults.cardColors(containerColor = cardContainerBg),
-            border = BorderStroke(1.dp, cardBorder)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                // Section Header Row
+                // Top App Bar with Back Button
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
+                    IconButton(
+                        onClick = { currentSubScreen = SettingsSubScreen.MAIN },
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF0F3B52)),
-                        contentAlignment = Alignment.Center
+                            .size(42.dp)
+                            .background(cardItemBg, CircleShape)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            tint = cyanAccent,
-                            modifier = Modifier.size(18.dp)
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = titleColor
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
 
                     Column {
                         Text(
-                            text = "Settings",
-                            style = MaterialTheme.typography.titleMedium.copy(
+                            text = if (isBn) "প্রোফাইল তথ্য" else "Profile Information",
+                            style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 16.sp
+                                color = titleColor,
+                                fontSize = 22.sp
                             )
                         )
                         Text(
-                            text = "Manage your profile and language preferences",
+                            text = if (isBn) "রিপোর্ট ও স্বাক্ষরের জন্য আপনার তথ্য" else "Personal profile for reports and signature",
                             style = MaterialTheme.typography.bodySmall.copy(
-                                color = slateSubtext,
+                                color = subtextColor,
                                 fontSize = 12.sp
                             )
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Item 1: Profile (জাহাঙ্গীর আলম • View profile details)
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showProfileDialog = true }
-                        .testTag("settings_profile_item"),
-                    shape = RoundedCornerShape(16.dp),
-                    color = cardItemBg
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF0F3B52)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = cyanAccent,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Profile",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontSize = 15.sp
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "জাহাঙ্গীর আলম • View profile details",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = slateSubtext,
-                                    fontSize = 12.5.sp
-                                )
-                            )
-                        }
-
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = cyanChevron,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Item 2: Language Change
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showLanguageDialog = true }
-                        .testTag("settings_language_item"),
-                    shape = RoundedCornerShape(16.dp),
-                    color = cardItemBg
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF0F3B52)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Translate,
-                                contentDescription = null,
-                                tint = cyanAccent,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Language Change",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        fontSize = 15.sp
-                                    )
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = cyanContainer,
-                                    border = BorderStroke(1.dp, Color(0xFF0284C7).copy(alpha = 0.5f))
-                                ) {
-                                    Text(
-                                        text = if (isBn) "🇧🇩 বাংলা" else "🇬🇧 English",
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
-                                        ),
-                                        color = cyanChevron
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "Switch app language between",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = slateSubtext,
-                                    fontSize = 12.5.sp
-                                )
-                            )
-                        }
-
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = cyanChevron,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        // ==========================================
-        // 2. SECTION CARD: App Preferences
-        // ==========================================
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(22.dp),
-            colors = CardDefaults.cardColors(containerColor = cardContainerBg),
-            border = BorderStroke(1.dp, cardBorder)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "App Preferences",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        fontSize = 17.sp
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Item 1: Theme Mode (Dark / Light)
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showThemeDialog = true }
-                        .testTag("settings_theme_item"),
-                    shape = RoundedCornerShape(16.dp),
-                    color = cardItemBg
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(darkBlueIconContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
-                                contentDescription = null,
-                                tint = cyanChevron,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Theme Mode (Dark / Light)",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontSize = 15.sp
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (isDarkMode) "Current: 🌙 Dark Mode" else "Current: ☀️ Light Mode",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = slateSubtext,
-                                    fontSize = 12.5.sp
-                                )
-                            )
-                        }
-
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = cyanChevron,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Item 2: Daily Workout Reminders (Exact matching from screenshot)
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showReminderDialog = true }
-                        .testTag("settings_reminder_item"),
-                    shape = RoundedCornerShape(16.dp),
-                    color = cardItemBg
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(CircleShape)
-                                .background(darkBlueIconContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = null,
-                                tint = cyanChevron,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = if (isBn) "নোটিফিকেশন" else "Notifications",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    fontSize = 15.sp
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (isBn) "অ্যাপ অ্যালার্ট ও নোটিফিকেশন নিয়ন্ত্রণ" else "Manage app alerts and notifications",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = slateSubtext,
-                                    fontSize = 12.5.sp
-                                )
-                            )
-                        }
-
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = null,
-                            tint = cyanChevron,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        // ==========================================
-        // 3. SECTION CARD: About & Owner Information
-        // ==========================================
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showAboutDialog = true }
-                .testTag("settings_about_item"),
-            shape = RoundedCornerShape(20.dp),
-            color = cardContainerBg,
-            border = BorderStroke(1.dp, cardBorder)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                // Profile Avatar Hero
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF0F3B52)),
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = cyanAccent,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(86.dp)
+                            .clip(CircleShape)
+                            .background(cyanContainer)
+                            .border(BorderStroke(2.dp, cyanAccent), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (profileGender == "মেয়ে" || profileGender == "Female") Icons.Default.Face else Icons.Default.Person,
+                            contentDescription = null,
+                            tint = cyanAccent,
+                            modifier = Modifier.size(46.dp)
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(14.dp))
+                // Profile Form Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        // 1. Full Name
+                        Text(
+                            text = if (isBn) "পূর্ণ নাম (Full Name):" else "Full Name:",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = titleColor
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = profileName,
+                            onValueChange = {
+                                profileName = it
+                                nameError = null
+                            },
+                            placeholder = { Text("মো: জাহাঙ্গীর আলম", color = subtextColor) },
+                            isError = nameError != null,
+                            supportingText = nameError?.let { { Text(it, color = Color(0xFFDC2626)) } },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = titleColor,
+                                unfocusedTextColor = titleColor,
+                                focusedBorderColor = cyanAccent,
+                                unfocusedBorderColor = cardBorder,
+                                focusedContainerColor = cardItemBg,
+                                unfocusedContainerColor = cardItemBg
+                            ),
+                            leadingIcon = {
+                                Icon(Icons.Default.Person, contentDescription = null, tint = cyanChevron)
+                            }
+                        )
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (isBn) "মালিকানা ও অ্যাপের তথ্য" else "About & Owner Information",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            fontSize = 15.sp
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // 2. Mobile Number
+                        Text(
+                            text = if (isBn) "মোবাইল নাম্বার (Mobile Number):" else "Mobile Number:",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = titleColor
                         )
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = if (isBn) "মো: জাহাঙ্গীর আলম • হিসাব খাতা v2.0.0" else "Md Jahangir Alam • Hisab Khata v2.0.0",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            color = slateSubtext,
-                            fontSize = 12.5.sp
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = profilePhone,
+                            onValueChange = { profilePhone = it },
+                            placeholder = { Text("+8801778600028", color = subtextColor) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = titleColor,
+                                unfocusedTextColor = titleColor,
+                                focusedBorderColor = cyanAccent,
+                                unfocusedBorderColor = cardBorder,
+                                focusedContainerColor = cardItemBg,
+                                unfocusedContainerColor = cardItemBg
+                            ),
+                            leadingIcon = {
+                                Icon(Icons.Default.Phone, contentDescription = null, tint = cyanChevron)
+                            }
                         )
-                    )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // 3. Email Address
+                        Text(
+                            text = if (isBn) "ইমেইল এড্রেস (Email Address):" else "Email Address:",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = titleColor
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = profileEmail,
+                            onValueChange = { profileEmail = it },
+                            placeholder = { Text("mdjahangiralam2528@gmail.com", color = subtextColor) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = titleColor,
+                                unfocusedTextColor = titleColor,
+                                focusedBorderColor = cyanAccent,
+                                unfocusedBorderColor = cardBorder,
+                                focusedContainerColor = cardItemBg,
+                                unfocusedContainerColor = cardItemBg
+                            ),
+                            leadingIcon = {
+                                Icon(Icons.Default.Email, contentDescription = null, tint = cyanChevron)
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // 4. Gender (ছেলে না মেয়ে / Male or Female)
+                        Text(
+                            text = if (isBn) "লিঙ্গ নির্বাচন (Gender):" else "Gender:",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = titleColor
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            val isMale = profileGender == "ছেলে" || profileGender == "Male"
+                            val isFemale = profileGender == "মেয়ে" || profileGender == "Female"
+
+                            // Male Option (ছেলে)
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { profileGender = "ছেলে" },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isMale) cyanContainer else cardItemBg,
+                                border = if (isMale) BorderStroke(1.5.dp, cyanAccent) else BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = if (isMale) cyanAccent else subtextColor,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isBn) "ছেলে" else "Male",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = if (isMale) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isMale) titleColor else subtextColor
+                                        )
+                                    )
+                                    if (isMale) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = cyanAccent, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+
+                            // Female Option (মেয়ে)
+                            Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { profileGender = "মেয়ে" },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isFemale) cyanContainer else cardItemBg,
+                                border = if (isFemale) BorderStroke(1.5.dp, cyanAccent) else BorderStroke(1.dp, cardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Face,
+                                        contentDescription = null,
+                                        tint = if (isFemale) cyanAccent else subtextColor,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isBn) "মেয়ে" else "Female",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = if (isFemale) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isFemale) titleColor else subtextColor
+                                        )
+                                    )
+                                    if (isFemale) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(Icons.Default.Check, contentDescription = null, tint = cyanAccent, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(22.dp))
+
+                        // 5. Save Button
+                        Button(
+                            onClick = {
+                                if (profileName.isBlank()) {
+                                    nameError = if (isBn) "দয়া করে আপনার নাম লিখুন" else "Please enter your name"
+                                    return@Button
+                                }
+                                viewModel.updateProfile(
+                                    name = profileName.trim(),
+                                    phone = profilePhone.trim(),
+                                    email = profileEmail.trim(),
+                                    gender = profileGender
+                                )
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        if (isBn) "প্রোফাইল সফলভাবে সংরক্ষিত হয়েছে!" else "Profile saved successfully!"
+                                    )
+                                }
+                                currentSubScreen = SettingsSubScreen.MAIN
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("save_profile_button")
+                        ) {
+                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isBn) "প্রোফাইল সেভ করুন" else "Save Profile",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = if (isBn)
+                                "সংরক্ষিত নাম রিপোর্ট ও সার্টিফিকেটে প্রস্তুতকারকের স্বাক্ষর হিসেবে প্রদর্শিত হবে।"
+                            else
+                                "Saved name will appear as the author's signature on all financial reports and statements.",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = subtextColor,
+                                fontSize = 11.5.sp
+                            ),
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
                 }
-
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = cyanChevron,
-                    modifier = Modifier.size(20.dp)
-                )
             }
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        // ==========================================
+        // SUB-SCREEN 2: HELP & SUPPORT PAGE
+        // ==========================================
+        SettingsSubScreen.HELP_AND_SUPPORT -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(pageBg)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
+                // Header with Back Arrow
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { currentSubScreen = SettingsSubScreen.MAIN },
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(cardItemBg, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = titleColor
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column {
+                        Text(
+                            text = if (isBn) "Help & Support (সহায়তা)" else "Help & Support",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = titleColor,
+                                fontSize = 22.sp
+                            )
+                        )
+                        Text(
+                            text = if (isBn) "ডেভেলপার ও কাস্টমার সার্ভিস যোগাযোগ" else "Developer contact and customer service",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = subtextColor,
+                                fontSize = 12.sp
+                            )
+                        )
+                    }
+                }
+
+                // Help & Support Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(cyanContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.HelpOutline, contentDescription = null, tint = cyanAccent)
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = if (isBn) "২৪/৭ সরাসরি সহায়তা" else "24/7 Dedicated Support",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = titleColor)
+                                )
+                                Text(
+                                    text = if (isBn) "অ্যাপ সম্পর্কিত যেকোনো প্রয়োজনে যোগাযোগ করুন" else "Reach out for any assistance with Hisab Khata",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = subtextColor)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(color = cardBorder)
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Developer Info Block
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            color = cardItemBg
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (isBn) "অ্যাপের মূল নির্মাতা ও স্বত্বাধিকারী" else "Official Developer & Owner",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = EmeraldPrimary)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "মো: জাহাঙ্গীর আলম (Md Jahangir Alam)",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = titleColor)
+                                )
+                                Text(
+                                    text = "Lead Developer & Financial Software Architect",
+                                    style = MaterialTheme.typography.bodySmall.copy(color = subtextColor)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Call Action Row
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(EmeraldContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Phone, contentDescription = null, tint = EmeraldDark, modifier = Modifier.size(18.dp))
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(if (isBn) "হেল্পলাইন মোবাইল:" else "Helpline Mobile:", style = MaterialTheme.typography.labelSmall, color = subtextColor)
+                                        Text("+8801778600028", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = titleColor))
+                                    }
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+8801778600028"))
+                                        context.startActivity(intent)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldDark),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(if (isBn) "কল করুন" else "Call", fontSize = 12.sp)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Email Action Row
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(cyanContainer),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.Email, contentDescription = null, tint = cyanAccent, modifier = Modifier.size(18.dp))
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(if (isBn) "অফিসিয়াল ইমেইল:" else "Official Email:", style = MaterialTheme.typography.labelSmall, color = subtextColor)
+                                        Text("mdjahangiralam2528@gmail.com", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium, color = titleColor))
+                                    }
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:mdjahangiralam2528@gmail.com"))
+                                        context.startActivity(intent)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F3B52)),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(if (isBn) "মেইল" else "Mail", fontSize = 12.sp, color = Color.White)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // SUB-SCREEN 3: PRIVACY POLICY PAGE
+        // ==========================================
+        SettingsSubScreen.PRIVACY_POLICY -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(pageBg)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
+                // Header with Back Arrow
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { currentSubScreen = SettingsSubScreen.MAIN },
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(cardItemBg, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = titleColor
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column {
+                        Text(
+                            text = if (isBn) "প্রাইভেসি পলিসি" else "Privacy Policy",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = titleColor,
+                                fontSize = 22.sp
+                            )
+                        )
+                        Text(
+                            text = if (isBn) "গুগল প্লে স্টোর পলিসি ও ডাটা নিরাপত্তা" else "Google Play Store Data Safety & Privacy Terms",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = subtextColor,
+                                fontSize = 12.sp
+                            )
+                        )
+                    }
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(cyanContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Security, contentDescription = null, tint = cyanAccent, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = if (isBn) "হিসাব খাতা প্রাইভেসি নীতিমালা" else "Hisab Khata Privacy Policy",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = titleColor)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        HorizontalDivider(color = cardBorder)
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        val sections = listOf(
+                            ("১. ডাটা নিরাপত্তা ও সংরক্ষণ" to "হিসাব খাতা অ্যাপ আপনার বাজার খরচ ও আর্থিক লেনদেনের সমস্ত তথ্য আপনার নিজস্ব ডিভাইসে এনক্রিপ্টেড ডাটাবেজে সংরক্ষণ করে। ক্লাউড ব্যাকআপের ক্ষেত্রে গুগলের নিরাপদ ফায়ারবেস ক্লাউড প্রটোকল ব্যবহার করা হয়।"),
+                            ("২. কোনো তৃতীয় পক্ষের সাথে ডাটা আদান-প্রদান নয়" to "আমরা ব্যবহারকারীর কোনো ব্যক্তিগত বা আর্থিক তথ্য কোনো প্রকার তৃতীয় পক্ষ বা বিজ্ঞাপনদাতার কাছে শেয়ার, বিক্রি বা হস্তান্তর করি না।"),
+                            ("৩. আপনার ডাটার ওপর সম্পূর্ণ নিয়ন্ত্রণ" to "আপনি যেকোনো সময় সেটিংস থেকে আপনার সম্পূর্ণ ডাটার ব্যাকআপ JSON আকারে ডাউনলোড করতে পারবেন এবং প্রয়োজনে এক ক্লিকেই সমস্ত ডাটা স্থায়ীভাবে মুছে ফেলতে পারবেন।"),
+                            ("৪. নীতিমালার আপডেট ও যোগাযোগ" to "প্রাইভেসি সংক্রান্ত যেকোনো জিজ্ঞাসা বা প্রশ্নের জন্য আমাদের ডেভেলপার মো: জাহাঙ্গীর আলম (mdjahangiralam2528@gmail.com / +8801778600028)-এর সাথে সরাসরি যোগাযোগ করতে পারেন।")
+                        )
+
+                        for ((title, desc) in sections) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, color = cyanChevron)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = desc,
+                                style = MaterialTheme.typography.bodyMedium.copy(color = subtextColor, lineHeight = 20.sp)
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = cardItemBg,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "সর্বশেষ আপডেট: অক্টোবর ২০২৬ • সর্বস্বত্ব সংরক্ষিত",
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(color = subtextColor)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // SUB-SCREEN: MAIN SETTINGS VIEW
+        // ==========================================
+        SettingsSubScreen.MAIN -> {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(pageBg)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+                    .testTag("settings_screen_root")
+            ) {
+                // TOP HEADER: Circular Cyan Settings Icon + Title & Subtitle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp, bottom = 22.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(cyanContainer)
+                            .border(BorderStroke(1.5.dp, cyanAccent.copy(alpha = 0.45f)), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = cyanAccent,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column {
+                        Text(
+                            text = if (isBn) "সেটিংস" else "Settings",
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = titleColor,
+                                fontSize = 26.sp
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isBn) "প্রোফাইল, ভাষা ও সিস্টেম পছন্দসমূহ পরিচালনা করুন" else "Manage your profile, language and app preferences",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = subtextColor,
+                                fontSize = 13.sp
+                            )
+                        )
+                    }
+                }
+
+                // ==========================================
+                // 1. SECTION CARD: Settings (Profile & Language)
+                // ==========================================
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(cyanContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = null,
+                                    tint = cyanAccent,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            Column {
+                                Text(
+                                    text = if (isBn) "সেটিংস" else "Settings",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = titleColor,
+                                        fontSize = 16.sp
+                                    )
+                                )
+                                Text(
+                                    text = if (isBn) "প্রোফাইল ও ভাষা পছন্দসমূহ পরিচালনা করুন" else "Manage your profile and language preferences",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = subtextColor,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Item 1: Profile (Navigates to dedicated Profile Page!)
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { currentSubScreen = SettingsSubScreen.PROFILE }
+                                .testTag("settings_profile_item"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                    .background(cyanContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (userProfile.gender == "মেয়ে") Icons.Default.Face else Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = cyanAccent,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isBn) "প্রোফাইল" else "Profile",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = titleColor,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "${userProfile.name} • ${if (isBn) "বিস্তারিত দেখুন" else "View profile details"}",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = subtextColor,
+                                            fontSize = 12.5.sp
+                                        ),
+                                        maxLines = 1
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = cyanChevron,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Item 2: Language Change
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showLanguageDialog = true }
+                                .testTag("settings_language_item"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(cyanContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Translate,
+                                        contentDescription = null,
+                                        tint = cyanAccent,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = if (isBn) "ভাষা পরিবর্তন" else "Language Change",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                color = titleColor,
+                                                fontSize = 15.sp
+                                            )
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = cyanContainer,
+                                            border = BorderStroke(1.dp, cyanAccent.copy(alpha = 0.5f))
+                                        ) {
+                                            Text(
+                                                text = if (isBn) "🇧🇩 বাংলা" else "🇬🇧 English",
+                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.sp
+                                                ),
+                                                color = cyanChevron
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isBn) "বাংলা ও ইংরেজির মাঝে পরিবর্তন" else "Switch app language between",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = subtextColor,
+                                            fontSize = 12.5.sp
+                                        )
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = cyanChevron,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // ==========================================
+                // 2. SECTION CARD: App Preferences
+                // ==========================================
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = if (isBn) "অ্যাপ পছন্দসমূহ" else "App Preferences",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = titleColor,
+                                fontSize = 17.sp
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Item 1: Theme Mode (Dark / Light)
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showThemeDialog = true }
+                                .testTag("settings_theme_item"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(darkBlueIconContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isDarkMode) Icons.Default.DarkMode else Icons.Default.LightMode,
+                                        contentDescription = null,
+                                        tint = cyanChevron,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isBn) "থিম মোড (ডার্ক / লাইট)" else "Theme Mode (Dark / Light)",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = titleColor,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isDarkMode) (if (isBn) "বর্তমান: 🌙 ডার্ক মোড" else "Current: 🌙 Dark Mode") else (if (isBn) "বর্তমান: ☀️ লাইট মোড" else "Current: ☀️ Light Mode"),
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = subtextColor,
+                                            fontSize = 12.5.sp
+                                        )
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = cyanChevron,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Item 2: Notifications
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showNotificationDialog = true }
+                                .testTag("settings_notification_item"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(darkBlueIconContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Notifications,
+                                        contentDescription = null,
+                                        tint = cyanChevron,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isBn) "নোটিফিকেশন" else "Notifications",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = titleColor,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isBn) "অ্যাপ অ্যালার্ট ও নোটিফিকেশন নিয়ন্ত্রণ" else "Manage app alerts and notifications",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = subtextColor,
+                                            fontSize = 12.5.sp
+                                        )
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = cyanChevron,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // ==========================================
+                // 3. SECTION CARD: Help, Privacy & About
+                // ==========================================
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardContainerBg),
+                    border = BorderStroke(1.dp, cardBorder)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = if (isBn) "সহায়তা ও আইনি তথ্য" else "Support & Information",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = titleColor,
+                                fontSize = 17.sp
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Help & Support Item
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { currentSubScreen = SettingsSubScreen.HELP_AND_SUPPORT }
+                                .testTag("settings_help_item"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(cyanContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.HelpOutline,
+                                        contentDescription = null,
+                                        tint = cyanAccent,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isBn) "Help & Support (সহায়তা)" else "Help & Support",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = titleColor,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isBn) "ডেভেলপার যোগাযোগ ও সহায়তা সেবা" else "Developer contacts & assistance",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = subtextColor,
+                                            fontSize = 12.5.sp
+                                        )
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = cyanChevron,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Privacy Policy Item
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { currentSubScreen = SettingsSubScreen.PRIVACY_POLICY }
+                                .testTag("settings_privacy_item"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(cyanContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Policy,
+                                        contentDescription = null,
+                                        tint = cyanAccent,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isBn) "প্রাইভেসি পলিসি" else "Privacy Policy",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = titleColor,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (isBn) "প্লে স্টোর ডাটা নিরাপত্তা ও নীতিমালা" else "Play Store data safety & privacy terms",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = subtextColor,
+                                            fontSize = 12.5.sp
+                                        )
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = cyanChevron,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // About & Owner Information Item
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showAboutDialog = true }
+                                .testTag("settings_about_item"),
+                            shape = RoundedCornerShape(16.dp),
+                            color = cardItemBg
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(cyanContainer),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = cyanAccent,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(14.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (isBn) "মালিকানা ও অ্যাপের তথ্য" else "About & Owner Information",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = titleColor,
+                                            fontSize = 15.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "${userProfile.name} • ${if (isBn) "হিসাব খাতা v2.0.0" else "Hisab Khata v2.0.0"}",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            color = subtextColor,
+                                            fontSize = 12.5.sp
+                                        ),
+                                        maxLines = 1
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = cyanChevron,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+            }
+        }
     }
 
     // ==========================================
     // MODAL DIALOGS
     // ==========================================
 
-    // 1. Profile Dialog (Full details, Cloud Sync, Backup & Restore)
-    if (showProfileDialog) {
-        AlertDialog(
-            onDismissRequest = { showProfileDialog = false },
-            containerColor = Color(0xFF131D2E),
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
-            title = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(cyanContainer),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Person, contentDescription = null, tint = cyanAccent, modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Profile Details",
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = Color.White)
-                        )
-                    }
-                    IconButton(onClick = { showProfileDialog = false }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = slateSubtext)
-                    }
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    // Owner Name Card
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = cardItemBg
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("নাম (Full Name):", style = MaterialTheme.typography.labelSmall, color = slateSubtext)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text("মো: জাহাঙ্গীর আলম (Md Jahangir Alam)", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Mobile Number Card with Dial Action
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = cardItemBg
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text("মোবাইল নাম্বার (Mobile):", style = MaterialTheme.typography.labelSmall, color = slateSubtext)
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text("+8801778600028", style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold, color = cyanChevron))
-                            }
-                            IconButton(
-                                onClick = {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+8801778600028"))
-                                    context.startActivity(intent)
-                                }
-                            ) {
-                                Icon(Icons.Default.Call, contentDescription = "Call", tint = EmeraldPrimary)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Email Card
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = cardItemBg
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("ইমেইল (Email):", style = MaterialTheme.typography.labelSmall, color = slateSubtext)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text("mdjahangiralam2528@gmail.com", style = MaterialTheme.typography.bodyMedium.copy(color = Color.White))
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = cardBorder)
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Cloud Account & Sync
-                    Text("Google Cloud Sync", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = cyanChevron))
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (currentUser != null) {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = cardItemBg
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CloudDone, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = currentUser?.email ?: "Connected",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = Color.White)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(
-                                        onClick = {
-                                            viewModel.syncFromCloud { res ->
-                                                scope.launch {
-                                                    if (res.isSuccess) {
-                                                        snackbarHostState.showSnackbar("ক্লাউড থেকে সফলভাবে সিঙ্ক সম্পন্ন হয়েছে")
-                                                    } else {
-                                                        snackbarHostState.showSnackbar("Sync failed: ${res.exceptionOrNull()?.message}")
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = EmeraldDark),
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Sync Now", fontSize = 12.sp)
-                                    }
-                                    OutlinedButton(
-                                        onClick = {
-                                            viewModel.signOut {
-                                                scope.launch {
-                                                    snackbarHostState.showSnackbar("Signed out successfully")
-                                                }
-                                            }
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Sign Out", fontSize = 12.sp, color = CrimsonDanger)
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Button(
-                            onClick = {
-                                val activity = context as? Activity
-                                if (activity != null) {
-                                    viewModel.signInWithGoogle(
-                                        activity = activity,
-                                        onSuccess = {
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar("Google Sign-In successful!")
-                                            }
-                                        },
-                                        onError = { err ->
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar(err)
-                                            }
-                                        }
-                                    )
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldDark),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("গুগল দিয়ে সাইন ইন ও ক্লাউড সিঙ্ক")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = cardBorder)
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Backup & Restore Actions
-                    Text("Backup & Restore (অফলাইন ব্যাকআপ)", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = cyanChevron))
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                viewModel.exportBackup(context) { file ->
-                                    if (file != null) {
-                                        val uri = FileProvider.getUriForFile(
-                                            context,
-                                            "${context.packageName}.fileprovider",
-                                            file
-                                        )
-                                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                            type = "application/json"
-                                            putExtra(Intent.EXTRA_STREAM, uri)
-                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        }
-                                        context.startActivity(Intent.createChooser(shareIntent, "Save Backup JSON"))
-                                    }
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F3B52)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Backup, contentDescription = null, modifier = Modifier.size(16.dp), tint = cyanAccent)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Download", fontSize = 12.sp, color = Color.White)
-                        }
-
-                        Button(
-                            onClick = { restoreFilePicker.launch("application/json") },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F3B52)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp), tint = cyanAccent)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Restore", fontSize = 12.sp, color = Color.White)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Clear Data
-                    OutlinedButton(
-                        onClick = {
-                            confirmText = ""
-                            showClearDataDialog = true
-                        },
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.DeleteForever, contentDescription = null, tint = CrimsonDanger, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("সকল ডাটা মুছুন (Clear All Data)", color = CrimsonDanger, fontSize = 12.sp)
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showProfileDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E384D))
-                ) {
-                    Text("বন্ধ করুন (Close)", color = Color.White)
-                }
-            }
-        )
-    }
-
-    // 2. Language Change Dialog
+    // Language Change Dialog
     if (showLanguageDialog) {
         AlertDialog(
             onDismissRequest = { showLanguageDialog = false },
-            containerColor = Color(0xFF131D2E),
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
+            containerColor = cardContainerBg,
+            titleContentColor = titleColor,
+            textContentColor = titleColor,
             title = {
-                Text("Select Language / ভাষা নির্বাচন", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                Text(
+                    text = if (isBn) "ভাষা নির্বাচন করুন" else "Select Language",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = titleColor)
+                )
             },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -907,8 +1427,8 @@ fun SettingsScreen(
                                 showLanguageDialog = false
                             },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (isBn) Color(0xFF0E384D) else cardItemBg,
-                        border = if (isBn) BorderStroke(1.5.dp, cyanAccent) else null
+                        color = if (isBn) cyanContainer else cardItemBg,
+                        border = if (isBn) BorderStroke(1.5.dp, cyanAccent) else BorderStroke(1.dp, cardBorder)
                     ) {
                         Row(
                             modifier = Modifier
@@ -920,7 +1440,7 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("🇧🇩", fontSize = 20.sp)
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text("বাংলা (Bengali)", style = MaterialTheme.typography.bodyLarge.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                                Text("বাংলা (Bengali)", style = MaterialTheme.typography.bodyLarge.copy(color = titleColor, fontWeight = FontWeight.Bold))
                             }
                             if (isBn) {
                                 Icon(Icons.Default.Check, contentDescription = null, tint = cyanAccent)
@@ -939,8 +1459,8 @@ fun SettingsScreen(
                                 showLanguageDialog = false
                             },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (!isBn) Color(0xFF0E384D) else cardItemBg,
-                        border = if (!isBn) BorderStroke(1.5.dp, cyanAccent) else null
+                        color = if (!isBn) cyanContainer else cardItemBg,
+                        border = if (!isBn) BorderStroke(1.5.dp, cyanAccent) else BorderStroke(1.dp, cardBorder)
                     ) {
                         Row(
                             modifier = Modifier
@@ -952,7 +1472,7 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("🇬🇧", fontSize = 20.sp)
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text("English", style = MaterialTheme.typography.bodyLarge.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                                Text("English", style = MaterialTheme.typography.bodyLarge.copy(color = titleColor, fontWeight = FontWeight.Bold))
                             }
                             if (!isBn) {
                                 Icon(Icons.Default.Check, contentDescription = null, tint = cyanAccent)
@@ -964,23 +1484,26 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = { showLanguageDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E384D))
+                    colors = ButtonDefaults.buttonColors(containerColor = cyanContainer)
                 ) {
-                    Text("Close", color = Color.White)
+                    Text(if (isBn) "বন্ধ করুন" else "Close", color = cyanAccent)
                 }
             }
         )
     }
 
-    // 3. Theme Mode Dialog (Dark / Light)
+    // Theme Mode Dialog (Dark / Light)
     if (showThemeDialog) {
         AlertDialog(
             onDismissRequest = { showThemeDialog = false },
-            containerColor = Color(0xFF131D2E),
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
+            containerColor = cardContainerBg,
+            titleContentColor = titleColor,
+            textContentColor = titleColor,
             title = {
-                Text("Theme Mode", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                Text(
+                    text = if (isBn) "থিম মোড নির্বাচন" else "Select Theme Mode",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = titleColor)
+                )
             },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -993,8 +1516,8 @@ fun SettingsScreen(
                                 showThemeDialog = false
                             },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (isDarkMode) Color(0xFF0E384D) else cardItemBg,
-                        border = if (isDarkMode) BorderStroke(1.5.dp, cyanAccent) else null
+                        color = if (isDarkMode) cyanContainer else cardItemBg,
+                        border = if (isDarkMode) BorderStroke(1.5.dp, cyanAccent) else BorderStroke(1.dp, cardBorder)
                     ) {
                         Row(
                             modifier = Modifier
@@ -1006,7 +1529,7 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.DarkMode, contentDescription = null, tint = cyanChevron)
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text("Dark Mode (🌙)", style = MaterialTheme.typography.bodyLarge.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                                Text(if (isBn) "ডার্ক মোড (🌙)" else "Dark Mode (🌙)", style = MaterialTheme.typography.bodyLarge.copy(color = titleColor, fontWeight = FontWeight.Bold))
                             }
                             if (isDarkMode) {
                                 Icon(Icons.Default.Check, contentDescription = null, tint = cyanAccent)
@@ -1025,8 +1548,8 @@ fun SettingsScreen(
                                 showThemeDialog = false
                             },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (!isDarkMode) Color(0xFF0E384D) else cardItemBg,
-                        border = if (!isDarkMode) BorderStroke(1.5.dp, cyanAccent) else null
+                        color = if (!isDarkMode) cyanContainer else cardItemBg,
+                        border = if (!isDarkMode) BorderStroke(1.5.dp, cyanAccent) else BorderStroke(1.dp, cardBorder)
                     ) {
                         Row(
                             modifier = Modifier
@@ -1036,9 +1559,9 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.LightMode, contentDescription = null, tint = Color(0xFFFBBF24))
+                                Icon(Icons.Default.LightMode, contentDescription = null, tint = Color(0xFFF59E0B))
                                 Spacer(modifier = Modifier.width(12.dp))
-                                Text("Light Mode (☀️)", style = MaterialTheme.typography.bodyLarge.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                                Text(if (isBn) "লাইট মোড (☀️)" else "Light Mode (☀️)", style = MaterialTheme.typography.bodyLarge.copy(color = titleColor, fontWeight = FontWeight.Bold))
                             }
                             if (!isDarkMode) {
                                 Icon(Icons.Default.Check, contentDescription = null, tint = cyanAccent)
@@ -1050,31 +1573,31 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = { showThemeDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E384D))
+                    colors = ButtonDefaults.buttonColors(containerColor = cyanContainer)
                 ) {
-                    Text("Close", color = Color.White)
+                    Text(if (isBn) "বন্ধ করুন" else "Close", color = cyanAccent)
                 }
             }
         )
     }
 
-    // 4. Daily Workout Reminders Dialog
-    if (showReminderDialog) {
+    // Notifications Dialog
+    if (showNotificationDialog) {
         var currentReminderTime by remember { mutableStateOf(reminderTime) }
         var currentEnabled by remember { mutableStateOf(reminderEnabled) }
 
         AlertDialog(
-            onDismissRequest = { showReminderDialog = false },
-            containerColor = Color(0xFF131D2E),
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
+            onDismissRequest = { showNotificationDialog = false },
+            containerColor = cardContainerBg,
+            titleContentColor = titleColor,
+            textContentColor = titleColor,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Notifications, contentDescription = null, tint = cyanChevron)
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = if (isBn) "নোটিফিকেশন ও অ্যালার্ট" else "Notifications & Alerts",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = titleColor)
                     )
                 }
             },
@@ -1082,15 +1605,14 @@ fun SettingsScreen(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = if (isBn)
-                            "দৈনিক হিসাব এন্ট্রি এবং সিস্টেমের গুরুত্বপূর্ণ নোটিফিকেশন নিয়ন্ত্রণ করুন।"
+                            "দৈনিক বাজার খরচ ও বাকি হিসাব এন্ট্রির নোটিফিকেশন সময়সূচি নিয়ন্ত্রণ করুন।"
                         else
-                            "Manage daily entry reminders and system alerts.",
+                            "Manage daily entry reminder schedule and app alerts.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = slateSubtext
+                        color = subtextColor
                     )
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Switch Row
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
@@ -1104,8 +1626,8 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("Enable Notifications", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                                Text(if (currentEnabled) "Active" else "Disabled", style = MaterialTheme.typography.labelSmall, color = slateSubtext)
+                                Text(if (isBn) "নোটিফিকেশন সক্রিয় রাখুন" else "Enable Notifications", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = titleColor))
+                                Text(if (currentEnabled) (if (isBn) "চালু আছে" else "Enabled") else (if (isBn) "বন্ধ আছে" else "Disabled"), style = MaterialTheme.typography.labelSmall, color = subtextColor)
                             }
                             Switch(
                                 checked = currentEnabled,
@@ -1119,7 +1641,7 @@ fun SettingsScreen(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Select Time:", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
+                    Text(if (isBn) "অ্যালার্ট সময় নির্বাচন:" else "Select Alert Time:", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = titleColor))
                     Spacer(modifier = Modifier.height(8.dp))
 
                     listOf("07:00 AM", "01:00 PM", "08:00 PM", "09:00 PM", "10:00 PM").forEach { time ->
@@ -1131,7 +1653,7 @@ fun SettingsScreen(
                                     currentReminderTime = time
                                 },
                             shape = RoundedCornerShape(10.dp),
-                            color = if (currentReminderTime == time && currentEnabled) Color(0xFF0E384D) else cardItemBg
+                            color = if (currentReminderTime == time && currentEnabled) cyanContainer else cardItemBg
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1140,7 +1662,7 @@ fun SettingsScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(time, style = MaterialTheme.typography.bodyMedium.copy(color = if (currentEnabled) Color.White else slateSubtext))
+                                Text(time, style = MaterialTheme.typography.bodyMedium.copy(color = if (currentEnabled) titleColor else subtextColor))
                                 if (currentReminderTime == time && currentEnabled) {
                                     Icon(Icons.Default.Check, contentDescription = null, tint = cyanAccent, modifier = Modifier.size(18.dp))
                                 }
@@ -1154,36 +1676,39 @@ fun SettingsScreen(
                     onClick = {
                         viewModel.setReminderEnabled(currentEnabled)
                         viewModel.setReminderTime(currentReminderTime)
-                        showReminderDialog = false
+                        showNotificationDialog = false
                         scope.launch {
-                            snackbarHostState.showSnackbar("Reminder updated: $currentReminderTime")
+                            snackbarHostState.showSnackbar(if (isBn) "নোটিফিকেশন আপডেট সম্পন্ন: $currentReminderTime" else "Notifications updated: $currentReminderTime")
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E384D))
+                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
                 ) {
-                    Text("Save", color = Color.White)
+                    Text(if (isBn) "সেভ করুন" else "Save", color = Color.White)
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showReminderDialog = false }) {
-                    Text("Cancel", color = slateSubtext)
+                OutlinedButton(onClick = { showNotificationDialog = false }) {
+                    Text(if (isBn) "বাতিল" else "Cancel", color = subtextColor)
                 }
             }
         )
     }
 
-    // 5. About & Owner Information Dialog
+    // About Dialog
     if (showAboutDialog) {
         AlertDialog(
             onDismissRequest = { showAboutDialog = false },
-            containerColor = Color(0xFF131D2E),
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
+            containerColor = cardContainerBg,
+            titleContentColor = titleColor,
+            textContentColor = titleColor,
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Info, contentDescription = null, tint = cyanAccent)
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("About & Owner Information", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    Text(
+                        text = if (isBn) "মালিকানা ও অ্যাপ পরিচিতি" else "About & Owner Information",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = titleColor)
+                    )
                 }
             },
             text = {
@@ -1201,16 +1726,14 @@ fun SettingsScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = EmeraldPrimary, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("যাচাইকৃত স্বত্বাধিকারী ও নির্মাতা (Verified Owner)", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = EmeraldPrimary))
+                                Text(if (isBn) "যাচাইকৃত স্বত্বাধিকারী ও নির্মাতা" else "Verified Owner & Developer", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = EmeraldPrimary))
                             }
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            Text("মালিক ও নির্মাতা: মো: জাহাঙ্গীর আলম", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                            Text("Owner Name: Md Jahangir Alam", style = MaterialTheme.typography.bodySmall, color = slateSubtext)
-
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text("মোবাইল নাম্বার (Mobile): +8801778600028", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = cyanChevron))
-                            Text("ইমেইল (Email): mdjahangiralam2528@gmail.com", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                            Text("মো: জাহাঙ্গীর আলম (Md Jahangir Alam)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = titleColor))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text("মোবাইল: +8801778600028", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = cyanChevron))
+                            Text("ইমেইল: mdjahangiralam2528@gmail.com", style = MaterialTheme.typography.bodySmall, color = subtextColor)
                         }
                     }
 
@@ -1222,45 +1745,10 @@ fun SettingsScreen(
                         color = cardItemBg
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
-                            Text("অ্যাপের নাম: হিসাব খাতা (Hisab Khata)", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
-                            Text("সংস্করণ (Version): 2.0.0", style = MaterialTheme.typography.bodySmall, color = slateSubtext)
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("© 2026 Md Jahangir Alam. সর্বস্বত্ব সংরক্ষিত।", style = MaterialTheme.typography.labelSmall, color = slateSubtext)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:+8801778600028"))
-                                context.startActivity(intent)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldDark),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("কল করুন", fontSize = 12.sp)
-                        }
-
-                        Button(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:mdjahangiralam2528@gmail.com"))
-                                context.startActivity(intent)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F3B52)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(16.dp), tint = cyanAccent)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("ইমেইল", fontSize = 12.sp, color = Color.White)
+                            Text(if (isBn) "অ্যাপের নাম: হিসাব খাতা (Hisab Khata)" else "App: Hisab Khata", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = titleColor))
+                            Text("সংস্করণ: 2.0.0 (Google Play Store Ready)", style = MaterialTheme.typography.bodySmall, color = subtextColor)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("© 2026 Md Jahangir Alam. সর্বস্বত্ব সংরক্ষিত।", style = MaterialTheme.typography.labelSmall, color = subtextColor)
                         }
                     }
                 }
@@ -1268,131 +1756,9 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = { showAboutDialog = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E384D))
+                    colors = ButtonDefaults.buttonColors(containerColor = cyanContainer)
                 ) {
-                    Text("Close", color = Color.White)
-                }
-            }
-        )
-    }
-
-    // Confirmation Dialog for Backup Restore
-    if (showRestoreConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showRestoreConfirmDialog = false
-                pendingRestoreJson = null
-            },
-            containerColor = Color(0xFF131D2E),
-            titleContentColor = Color.White,
-            textContentColor = Color.White,
-            icon = { Icon(Icons.Default.Restore, contentDescription = null, tint = EmeraldPrimary) },
-            title = {
-                Text(
-                    text = "Confirm Backup Restore",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                )
-            },
-            text = {
-                Text(
-                    text = "Do you want to restore records from this backup? Existing records will be replaced.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val json = pendingRestoreJson
-                        if (json != null) {
-                            viewModel.importBackup(json, replaceExisting = true) { res ->
-                                if (res.isSuccess) {
-                                    val count = res.getOrNull() ?: 0
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            if (isBn) "$count টি রেকর্ড সফলভাবে রিস্টোর হয়েছে" else "$count records successfully restored"
-                                        )
-                                    }
-                                } else {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            "Restore error: ${res.exceptionOrNull()?.message}"
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        showRestoreConfirmDialog = false
-                        pendingRestoreJson = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary)
-                ) {
-                    Text("Yes, Restore")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = {
-                    showRestoreConfirmDialog = false
-                    pendingRestoreJson = null
-                }) {
-                    Text("Cancel", color = slateSubtext)
-                }
-            }
-        )
-    }
-
-    // Confirmation Dialog for Clear All Data
-    if (showClearDataDialog) {
-        AlertDialog(
-            onDismissRequest = { showClearDataDialog = false },
-            containerColor = Color(0xFF131D2E),
-            titleContentColor = CrimsonDanger,
-            textContentColor = Color.White,
-            icon = { Icon(Icons.Default.Warning, contentDescription = null, tint = CrimsonDanger) },
-            title = {
-                Text(
-                    text = "Permanently Delete All Data?",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = CrimsonDanger
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "This action cannot be undone. Type 'DELETE' below to confirm:",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = confirmText,
-                        onValueChange = { confirmText = it },
-                        label = { Text("DELETE") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                val isMatched = confirmText.trim().equals("DELETE", ignoreCase = true) ||
-                        confirmText.trim() == "মুছে ফেলুন"
-                Button(
-                    onClick = {
-                        if (isMatched) {
-                            viewModel.clearAllData {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("All data successfully deleted")
-                                }
-                            }
-                            showClearDataDialog = false
-                        }
-                    },
-                    enabled = isMatched,
-                    colors = ButtonDefaults.buttonColors(containerColor = CrimsonDanger)
-                ) {
-                    Text("Delete Permanently")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showClearDataDialog = false }) {
-                    Text("Cancel", color = slateSubtext)
+                    Text(if (isBn) "বন্ধ করুন" else "Close", color = cyanAccent)
                 }
             }
         )

@@ -1,5 +1,8 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +19,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -82,6 +89,17 @@ fun ExpenseTrendCard(
 
     // Total for the 7 days
     val total7Days = remember(barsData) { barsData.sumOf { it.amount } }
+
+    var animationTriggered by remember { mutableStateOf(false) }
+    val animProgress by animateFloatAsState(
+        targetValue = if (animationTriggered) 1f else 0f,
+        animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+        label = "chart_bars_rise"
+    )
+
+    LaunchedEffect(Unit) {
+        animationTriggered = true
+    }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -160,8 +178,9 @@ fun ExpenseTrendCard(
                         val centerX = index * spacing + spacing / 2f
                         val left = centerX - barWidth / 2f
                         val isToday = index == barCount - 1
-                        val barHeight = ((item.amount / maxAmount) * (baselineY - 10f)).toFloat()
-                        val top = baselineY - (if (barHeight < 4f) 4f else barHeight)
+                        val fullHeight = ((item.amount / maxAmount) * (baselineY - 10f)).toFloat()
+                        val animatedHeight = fullHeight * animProgress
+                        val top = baselineY - (if (animatedHeight < 4f) 4f else animatedHeight)
 
                         // Highlight today with darker emerald, past days with soft mint
                         val barColor = if (isToday) {

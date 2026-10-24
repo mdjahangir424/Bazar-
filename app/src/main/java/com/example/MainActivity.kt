@@ -100,6 +100,7 @@ fun MainAppContent(viewModel: FinancialViewModel) {
     var currentScreen by remember { mutableStateOf(NavigationScreen.DASHBOARD) }
     val snackbarHostState = remember { SnackbarHostState() }
     val language by viewModel.language.collectAsStateWithLifecycle()
+    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
 
     // Handle system back navigation: return to Dashboard from any secondary screen
     if (currentScreen != NavigationScreen.DASHBOARD) {
@@ -108,12 +109,18 @@ fun MainAppContent(viewModel: FinancialViewModel) {
         }
     }
 
+    val navBarContainer = if (isDarkMode) Color(0xFF0F1E36) else Color.White
+    val navUnselected = if (isDarkMode) Color(0xFF94A3B8) else Slate600
+    val navSelectedIndicator = if (isDarkMode) Color(0xFF1E293B) else Navy800
+    val navSelectedText = if (isDarkMode) Color(0xFF38BDF8) else Navy900
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             NavigationBar(
-                containerColor = Color.White,
+                containerColor = navBarContainer,
                 tonalElevation = 8.dp
             ) {
                 // 1. Dashboard
@@ -130,10 +137,10 @@ fun MainAppContent(viewModel: FinancialViewModel) {
                     },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.White,
-                        selectedTextColor = Navy900,
-                        indicatorColor = Navy800,
-                        unselectedIconColor = Slate600,
-                        unselectedTextColor = Slate600
+                        selectedTextColor = navSelectedText,
+                        indicatorColor = navSelectedIndicator,
+                        unselectedIconColor = navUnselected,
+                        unselectedTextColor = navUnselected
                     ),
                     modifier = Modifier.testTag("nav_dashboard")
                 )
@@ -154,8 +161,8 @@ fun MainAppContent(viewModel: FinancialViewModel) {
                         selectedIconColor = Color.White,
                         selectedTextColor = EmeraldDark,
                         indicatorColor = EmeraldPrimary,
-                        unselectedIconColor = Slate600,
-                        unselectedTextColor = Slate600
+                        unselectedIconColor = navUnselected,
+                        unselectedTextColor = navUnselected
                     ),
                     modifier = Modifier.testTag("nav_market_expenses")
                 )
@@ -174,10 +181,10 @@ fun MainAppContent(viewModel: FinancialViewModel) {
                     },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.White,
-                        selectedTextColor = Navy900,
-                        indicatorColor = Navy800,
-                        unselectedIconColor = Slate600,
-                        unselectedTextColor = Slate600
+                        selectedTextColor = navSelectedText,
+                        indicatorColor = navSelectedIndicator,
+                        unselectedIconColor = navUnselected,
+                        unselectedTextColor = navUnselected
                     ),
                     modifier = Modifier.testTag("nav_outstanding")
                 )
@@ -196,10 +203,10 @@ fun MainAppContent(viewModel: FinancialViewModel) {
                     },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.White,
-                        selectedTextColor = Navy900,
-                        indicatorColor = Navy800,
-                        unselectedIconColor = Slate600,
-                        unselectedTextColor = Slate600
+                        selectedTextColor = navSelectedText,
+                        indicatorColor = navSelectedIndicator,
+                        unselectedIconColor = navUnselected,
+                        unselectedTextColor = navUnselected
                     ),
                     modifier = Modifier.testTag("nav_reports")
                 )
@@ -218,10 +225,10 @@ fun MainAppContent(viewModel: FinancialViewModel) {
                     },
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color.White,
-                        selectedTextColor = Navy900,
-                        indicatorColor = Navy800,
-                        unselectedIconColor = Slate600,
-                        unselectedTextColor = Slate600
+                        selectedTextColor = navSelectedText,
+                        indicatorColor = navSelectedIndicator,
+                        unselectedIconColor = navUnselected,
+                        unselectedTextColor = navUnselected
                     ),
                     modifier = Modifier.testTag("nav_settings")
                 )
