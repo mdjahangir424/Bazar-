@@ -73,19 +73,30 @@ class MainActivity : ComponentActivity() {
         com.example.data.cloud.FirebaseAppInitializer.ensureInitialized(applicationContext)
 
         val database = AppDatabase.getDatabase(applicationContext)
-        val repository = FinancialRepository(
-            expenseDao = database.expenseDao(),
-            outstandingDao = database.outstandingDao(),
-            paymentDao = database.paymentDao()
-        )
-        val authManager = com.example.data.auth.AuthManager(applicationContext)
+        val syncQueueDao = database.syncQueueDao()
+        val networkMonitor = com.example.data.network.NetworkMonitor(applicationContext)
         val syncManager = com.example.data.cloud.FirestoreSyncManager(
             context = applicationContext,
             expenseDao = database.expenseDao(),
             outstandingDao = database.outstandingDao(),
-            paymentDao = database.paymentDao()
+            paymentDao = database.paymentDao(),
+            syncQueueDao = syncQueueDao
         )
-        val factory = FinancialViewModelFactory(repository, authManager, syncManager)
+        val repository = FinancialRepository(
+            expenseDao = database.expenseDao(),
+            outstandingDao = database.outstandingDao(),
+            paymentDao = database.paymentDao(),
+            syncQueueDao = syncQueueDao
+        )
+        val authManager = com.example.data.auth.AuthManager(applicationContext)
+        val factory = FinancialViewModelFactory(
+            repository = repository,
+            authManager = authManager,
+            syncManager = syncManager,
+            syncQueueDao = syncQueueDao,
+            networkMonitor = networkMonitor,
+            context = applicationContext
+        )
         viewModel = ViewModelProvider(this, factory)[FinancialViewModel::class.java]
 
         setContent {

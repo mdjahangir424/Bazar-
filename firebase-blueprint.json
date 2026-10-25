@@ -22,16 +22,15 @@
           "description": "Optional expense note"
         },
         "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Server timestamp of creation"
+          "type": "integer",
+          "description": "Creation timestamp in milliseconds"
         },
-        "userId": {
+        "ownerUid": {
           "type": "string",
           "description": "User ID of the owner"
         }
       },
-      "required": ["date", "amount", "userId"]
+      "required": ["date", "amount"]
     },
     "OutstandingEntry": {
       "title": "OutstandingEntry",
@@ -55,16 +54,15 @@
           "description": "Optional note"
         },
         "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Server timestamp of creation"
+          "type": "integer",
+          "description": "Creation timestamp in milliseconds"
         },
-        "userId": {
+        "ownerUid": {
           "type": "string",
           "description": "User ID of the owner"
         }
       },
-      "required": ["date", "amount", "userId"]
+      "required": ["date", "amount"]
     },
     "PaymentRecord": {
       "title": "PaymentRecord",
@@ -88,16 +86,36 @@
           "description": "Optional note"
         },
         "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Server timestamp of creation"
+          "type": "integer",
+          "description": "Creation timestamp in milliseconds"
         },
-        "userId": {
+        "ownerUid": {
           "type": "string",
           "description": "User ID of the owner"
         }
       },
-      "required": ["date", "amount", "userId"]
+      "required": ["date", "amount"]
+    },
+    "BackupSnapshot": {
+      "title": "BackupSnapshot",
+      "description": "Versioned cloud backup snapshot",
+      "type": "object",
+      "properties": {
+        "backupId": { "type": "string" },
+        "backupTime": { "type": "string" },
+        "timestamp": { "type": "integer" },
+        "ownerUid": { "type": "string" },
+        "schemaVersion": { "type": "integer" },
+        "expensesCount": { "type": "integer" },
+        "outstandingCount": { "type": "integer" },
+        "paymentsCount": { "type": "integer" },
+        "totalExpenses": { "type": "number" },
+        "netBalance": { "type": "number" },
+        "expensesJson": { "type": "string" },
+        "outstandingJson": { "type": "string" },
+        "paymentsJson": { "type": "string" }
+      },
+      "required": ["backupId", "timestamp", "ownerUid"]
     }
   },
   "firestore": {
@@ -112,6 +130,14 @@
     "/users/{userId}/payment_records/{paymentId}": {
       "schema": "#/entities/PaymentRecord",
       "description": "Payments scoped to the authenticated user"
+    },
+    "/users/{userId}/backup_snapshots/{backupId}": {
+      "schema": "#/entities/BackupSnapshot",
+      "description": "Versioned backup snapshots for user recovery"
+    },
+    "/users/{userId}/sync_metadata/{metaId}": {
+      "schema": "#/entities/BackupSnapshot",
+      "description": "Latest sync status metadata"
     }
   }
 }

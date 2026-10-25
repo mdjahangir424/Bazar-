@@ -3,9 +3,11 @@ package com.example.data.repository
 import com.example.data.local.ExpenseDao
 import com.example.data.local.OutstandingDao
 import com.example.data.local.PaymentDao
+import com.example.data.local.SyncQueueDao
 import com.example.data.model.MarketExpense
 import com.example.data.model.OutstandingEntry
 import com.example.data.model.PaymentRecord
+import com.example.data.model.SyncQueueItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -15,7 +17,9 @@ import org.json.JSONObject
 class FinancialRepository(
     private val expenseDao: ExpenseDao,
     private val outstandingDao: OutstandingDao,
-    private val paymentDao: PaymentDao
+    private val paymentDao: PaymentDao,
+    private val syncQueueDao: SyncQueueDao? = null,
+    private val onDataChanged: (() -> Unit)? = null
 ) {
     val allExpenses: Flow<List<MarketExpense>> = expenseDao.getAllExpenses()
     val allOutstanding: Flow<List<OutstandingEntry>> = outstandingDao.getAllOutstanding()
@@ -39,15 +43,23 @@ class FinancialRepository(
             amount = amount,
             note = note.trim()
         )
-        expenseDao.insertExpense(item)
+        val id = expenseDao.insertExpense(item)
+        val finalItem = item.copy(id = id)
+        enqueueSync("EXPENSE", id, "INSERT", serializeExpense(finalItem))
+        onDataChanged?.invoke()
+        id
     }
 
     suspend fun updateExpense(expense: MarketExpense) = withContext(Dispatchers.IO) {
         expenseDao.updateExpense(expense)
+        enqueueSync("EXPENSE", expense.id, "UPDATE", serializeExpense(expense))
+        onDataChanged?.invoke()
     }
 
     suspend fun deleteExpense(expense: MarketExpense) = withContext(Dispatchers.IO) {
         expenseDao.deleteExpense(expense)
+        enqueueSync("EXPENSE", expense.id, "DELETE", serializeExpense(expense))
+        onDataChanged?.invoke()
     }
 
     // Outstanding operations
@@ -59,15 +71,23 @@ class FinancialRepository(
             amount = amount,
             note = note.trim()
         )
-        outstandingDao.insertOutstanding(item)
+        val id = outstandingDao.insertOutstanding(item)
+        val finalItem = item.copy(id = id)
+        enqueueSync("OUTSTANDING", id, "INSERT", serializeOutstanding(finalItem))
+        onDataChanged?.invoke()
+        id
     }
 
     suspend fun updateOutstanding(entry: OutstandingEntry) = withContext(Dispatchers.IO) {
         outstandingDao.updateOutstanding(entry)
+        enqueueSync("OUTSTANDING", entry.id, "UPDATE", serializeOutstanding(entry))
+        onDataChanged?.invoke()
     }
 
     suspend fun deleteOutstanding(entry: OutstandingEntry) = withContext(Dispatchers.IO) {
         outstandingDao.deleteOutstanding(entry)
+        enqueueSync("OUTSTANDING", entry.id, "DELETE", serializeOutstanding(entry))
+        onDataChanged?.invoke()
     }
 
     // Payment operations
@@ -79,24 +99,82 @@ class FinancialRepository(
             amount = amount,
             note = note.trim()
         )
-        paymentDao.insertPayment(item)
+        val id = paymentDao.insertPayment(item)
+        val finalItem = item.copy(id = id)
+        enqueueSync("PAYMENT", id, "INSERT", serializePayment(finalItem))
+        onDataChanged?.invoke()
+        id
     }
 
     suspend fun updatePayment(payment: PaymentRecord) = withContext(Dispatchers.IO) {
         paymentDao.updatePayment(payment)
+        enqueueSync("PAYMENT", payment.id, "UPDATE", serializePayment(payment))
+        onDataChanged?.invoke()
     }
 
     suspend fun deletePayment(payment: PaymentRecord) = withContext(Dispatchers.IO) {
         paymentDao.deletePayment(payment)
+        enqueueSync("PAYMENT", payment.id, "DELETE", serializePayment(payment))
+        onDataChanged?.invoke()
     }
 
     suspend fun clearAllData() = withContext(Dispatchers.IO) {
         expenseDao.deleteAll()
         outstandingDao.deleteAll()
         paymentDao.deleteAll()
+        syncQueueDao?.clearAll()
     }
 
-    // Backup & Restore
+    private suspend fun enqueueSync(entityType: String, entityId: Long, op: String, payload: String) {
+        try {
+            syncQueueDao?.enqueue(
+                SyncQueueItem(
+                    entityType = entityType,
+                    entityId = entityId,
+                    operation = op,
+                    payloadJson = payload,
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+        } catch (e: Exception) {
+            // Queue insertion failure should not block local offline operation
+        }
+    }
+
+    private fun serializeExpense(item: MarketExpense): String {
+        return JSONObject().apply {
+            put("id", item.id)
+            put("serialNo", item.serialNo)
+            put("date", item.date)
+            put("amount", item.amount)
+            put("note", item.note)
+            put("createdAt", item.createdAt)
+        }.toString()
+    }
+
+    private fun serializeOutstanding(item: OutstandingEntry): String {
+        return JSONObject().apply {
+            put("id", item.id)
+            put("serialNo", item.serialNo)
+            put("date", item.date)
+            put("amount", item.amount)
+            put("note", item.note)
+            put("createdAt", item.createdAt)
+        }.toString()
+    }
+
+    private fun serializePayment(item: PaymentRecord): String {
+        return JSONObject().apply {
+            put("id", item.id)
+            put("serialNo", item.serialNo)
+            put("date", item.date)
+            put("amount", item.amount)
+            put("note", item.note)
+            put("createdAt", item.createdAt)
+        }.toString()
+    }
+
+    // Local JSON Backup & Restore
     suspend fun exportBackupJson(
         expenses: List<MarketExpense>,
         outstanding: List<OutstandingEntry>,

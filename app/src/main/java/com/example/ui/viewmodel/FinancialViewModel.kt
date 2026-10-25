@@ -7,9 +7,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.auth.AuthManager
 import com.example.data.cloud.FirestoreSyncManager
+import com.example.data.cloud.SyncWorker
+import com.example.data.local.SyncQueueDao
+import com.example.data.model.BackupSnapshotInfo
 import com.example.data.model.MarketExpense
 import com.example.data.model.OutstandingEntry
 import com.example.data.model.PaymentRecord
+import com.example.data.network.NetworkMonitor
 import com.example.data.repository.FinancialRepository
 import com.example.ui.util.AppLanguage
 import com.example.ui.util.BanglaFormatter
@@ -49,7 +53,10 @@ data class UserProfile(
 class FinancialViewModel(
     private val repository: FinancialRepository,
     private val authManager: AuthManager? = null,
-    private val syncManager: FirestoreSyncManager? = null
+    private val syncManager: FirestoreSyncManager? = null,
+    private val syncQueueDao: SyncQueueDao? = null,
+    private val networkMonitor: NetworkMonitor? = null,
+    private val appContext: Context? = null
 ) : ViewModel() {
 
     private val _userProfile = MutableStateFlow(UserProfile())
@@ -73,13 +80,52 @@ class FinancialViewModel(
     val currentUser: StateFlow<FirebaseUser?> = authManager?.currentUser
         ?: MutableStateFlow(null).asStateFlow()
 
+    val isOnline: StateFlow<Boolean> = networkMonitor?.isOnline
+        ?: MutableStateFlow(true).asStateFlow()
+
+    val isLiveSyncActive: StateFlow<Boolean> = syncManager?.isLiveSyncActive
+        ?: MutableStateFlow(false).asStateFlow()
+
+    val syncState: StateFlow<String> = syncManager?.syncState
+        ?: MutableStateFlow("IDLE").asStateFlow()
+
+    val lastSyncError: StateFlow<String?> = syncManager?.lastSyncError
+        ?: MutableStateFlow(null).asStateFlow()
+
+    val pendingSyncCount: StateFlow<Int> = syncQueueDao?.getPendingCountFlow()
+        ?.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+        ?: MutableStateFlow(0).asStateFlow()
+
+    private val _availableBackups = MutableStateFlow<List<BackupSnapshotInfo>>(emptyList())
+    val availableBackups: StateFlow<List<BackupSnapshotInfo>> = _availableBackups.asStateFlow()
+
+    private val _lastCloudBackupTime = MutableStateFlow<String?>(null)
+    val lastCloudBackupTime: StateFlow<String?> = _lastCloudBackupTime.asStateFlow()
+
     init {
-        // Attempt silent auto sign-in and cloud sync on startup
+        // Observe auth state changes to start/stop live sync and flush offline queue
+        viewModelScope.launch {
+            currentUser.collect { user ->
+                if (user != null) {
+                    syncManager?.startLiveSync(user.uid, viewModelScope)
+                    // Trigger queue flush and initial sync
+                    syncManager?.flushPendingSyncQueue(user.uid)
+                    loadAvailableBackups()
+                } else {
+                    syncManager?.stopLiveSync()
+                    _availableBackups.value = emptyList()
+                }
+            }
+        }
+
+        // Silent auto sign-in via Google Credential Manager on app startup
         authManager?.attemptAutoSignIn(viewModelScope) { success ->
             if (success) {
                 authManager.currentUser.value?.uid?.let { uid ->
                     viewModelScope.launch {
                         syncManager?.syncDownFromCloud(uid)
+                        syncManager?.flushPendingSyncQueue(uid)
+                        loadAvailableBackups()
                     }
                 }
             }
@@ -170,7 +216,7 @@ class FinancialViewModel(
         _allowNegativeBalance.value = allow
     }
 
-    // Auth & Cloud Sync
+    // Google Sign-In
     fun signInWithGoogle(
         activity: Activity,
         onSuccess: (FirebaseUser) -> Unit,
@@ -182,7 +228,9 @@ class FinancialViewModel(
             scope = viewModelScope,
             onSuccess = { user ->
                 viewModelScope.launch {
-                    syncManager?.syncDownFromCloud(user.uid)
+                    syncManager?.startLiveSync(user.uid, viewModelScope)
+                    syncManager?.flushPendingSyncQueue(user.uid)
+                    loadAvailableBackups()
                 }
                 onSuccess(user)
             },
@@ -191,35 +239,156 @@ class FinancialViewModel(
         ) ?: onError("Authentication service not initialized")
     }
 
+    // Email / Password Authentication
+    fun signInWithEmail(
+        email: String,
+        pass: String,
+        onSuccess: (FirebaseUser) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        authManager?.signInWithEmail(
+            email = email,
+            pass = pass,
+            scope = viewModelScope,
+            onSuccess = { user ->
+                viewModelScope.launch {
+                    syncManager?.startLiveSync(user.uid, viewModelScope)
+                    syncManager?.flushPendingSyncQueue(user.uid)
+                    loadAvailableBackups()
+                }
+                onSuccess(user)
+            },
+            onError = onError
+        ) ?: onError("Authentication service not initialized")
+    }
+
+    fun signUpWithEmail(
+        email: String,
+        pass: String,
+        onSuccess: (FirebaseUser) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        authManager?.signUpWithEmail(
+            email = email,
+            pass = pass,
+            scope = viewModelScope,
+            onSuccess = { user ->
+                viewModelScope.launch {
+                    syncManager?.startLiveSync(user.uid, viewModelScope)
+                    syncManager?.flushPendingSyncQueue(user.uid)
+                    loadAvailableBackups()
+                }
+                onSuccess(user)
+            },
+            onError = onError
+        ) ?: onError("Authentication service not initialized")
+    }
+
+    fun sendPasswordReset(
+        email: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        authManager?.sendPasswordResetEmail(email, viewModelScope, onSuccess, onError)
+            ?: onError("Authentication service not initialized")
+    }
+
+    fun sendEmailVerification(
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        authManager?.sendEmailVerification(viewModelScope, onSuccess, onError)
+            ?: onError("Authentication service not initialized")
+    }
+
     fun signOut(onComplete: () -> Unit = {}) {
+        syncManager?.stopLiveSync()
+        _availableBackups.value = emptyList()
         authManager?.signOut(viewModelScope, onComplete) ?: onComplete()
     }
 
-    private val _lastCloudBackupTime = MutableStateFlow<String?>(null)
-    val lastCloudBackupTime: StateFlow<String?> = _lastCloudBackupTime.asStateFlow()
-
-    fun backupAllToCloud(onResult: (Result<String>) -> Unit) {
+    // Cloud Live Sync & Offline Queue
+    fun flushPendingSync(onResult: (Result<Int>) -> Unit = {}) {
         val uid = authManager?.currentUser?.value?.uid
         if (uid != null && syncManager != null) {
             viewModelScope.launch {
-                val res = syncManager.backupAllToCloud(
+                val res = syncManager.flushPendingSyncQueue(uid)
+                onResult(res)
+            }
+        } else {
+            appContext?.let { SyncWorker.enqueueSync(it) }
+            onResult(Result.failure(IllegalStateException("দয়া করে আগে সাইন ইন করুন")))
+        }
+    }
+
+    // Cloud Backup & Restore
+    fun createCloudBackup(onResult: (Result<BackupSnapshotInfo>) -> Unit) {
+        val uid = authManager?.currentUser?.value?.uid
+        if (uid != null && syncManager != null) {
+            viewModelScope.launch {
+                val res = syncManager.createCloudBackup(
                     userId = uid,
                     expenses = expenses.value,
                     outstanding = outstanding.value,
                     payments = payments.value
                 )
                 if (res.isSuccess) {
-                    _lastCloudBackupTime.value = res.getOrNull()
+                    val info = res.getOrNull()
+                    _lastCloudBackupTime.value = info?.backupTime
+                    loadAvailableBackups()
                 }
                 onResult(res)
             }
         } else {
-            onResult(Result.failure(IllegalStateException("দয়া করে আগে গুগল একাউন্টে সাইন ইন করুন (Please sign in first)")))
+            onResult(Result.failure(IllegalStateException("দয়া করে আগে সাইন ইন করুন (Please sign in first)")))
         }
     }
 
-    fun restoreFromCloud(onResult: (Result<Int>) -> Unit) {
-        syncFromCloud(onResult)
+    fun loadAvailableBackups(onResult: (Result<List<BackupSnapshotInfo>>) -> Unit = {}) {
+        val uid = authManager?.currentUser?.value?.uid
+        if (uid != null && syncManager != null) {
+            viewModelScope.launch {
+                val res = syncManager.getAvailableCloudBackups(uid)
+                if (res.isSuccess) {
+                    val list = res.getOrNull().orEmpty()
+                    _availableBackups.value = list
+                    if (list.isNotEmpty()) {
+                        _lastCloudBackupTime.value = list.first().backupTime
+                    }
+                }
+                onResult(res)
+            }
+        }
+    }
+
+    fun restoreCloudBackup(
+        backupId: String,
+        isReplaceMode: Boolean,
+        onResult: (Result<Int>) -> Unit
+    ) {
+        val uid = authManager?.currentUser?.value?.uid
+        if (uid != null && syncManager != null) {
+            viewModelScope.launch {
+                val res = syncManager.restoreCloudBackup(uid, backupId, isReplaceMode)
+                onResult(res)
+            }
+        } else {
+            onResult(Result.failure(IllegalStateException("User is not signed in")))
+        }
+    }
+
+    fun triggerImmediateSync(onResult: (Result<Int>) -> Unit = {}) {
+        flushPendingSync(onResult)
+    }
+
+    fun backupAllToCloud(onResult: (Result<String>) -> Unit) {
+        createCloudBackup { res ->
+            res.onSuccess { info ->
+                onResult(Result.success(info.backupTime))
+            }.onFailure { ex ->
+                onResult(Result.failure(ex))
+            }
+        }
     }
 
     fun syncFromCloud(onResult: (Result<Int>) -> Unit) {
@@ -238,6 +407,10 @@ class FinancialViewModel(
         }
     }
 
+    fun restoreFromCloud(onResult: (Result<Int>) -> Unit) {
+        syncFromCloud(onResult)
+    }
+
     // Market Expense Operations
     fun addExpense(
         amount: Double,
@@ -252,12 +425,8 @@ class FinancialViewModel(
         }
         viewModelScope.launch {
             try {
-                val id = repository.addExpense(date, amount, note)
-                val uid = authManager?.currentUser?.value?.uid
-                if (uid != null && syncManager != null) {
-                    val exp = MarketExpense(id = id, date = date, amount = amount, note = note)
-                    syncManager.uploadExpense(uid, exp)
-                }
+                repository.addExpense(date, amount, note)
+                triggerBackgroundOrDirectSync()
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.message ?: "Failed to save expense")
@@ -268,10 +437,7 @@ class FinancialViewModel(
     fun updateExpense(expense: MarketExpense, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             repository.updateExpense(expense)
-            val uid = authManager?.currentUser?.value?.uid
-            if (uid != null && syncManager != null) {
-                syncManager.uploadExpense(uid, expense)
-            }
+            triggerBackgroundOrDirectSync()
             onSuccess()
         }
     }
@@ -279,10 +445,7 @@ class FinancialViewModel(
     fun deleteExpense(expense: MarketExpense) {
         viewModelScope.launch {
             repository.deleteExpense(expense)
-            val uid = authManager?.currentUser?.value?.uid
-            if (uid != null && syncManager != null) {
-                syncManager.deleteExpense(uid, expense.id)
-            }
+            triggerBackgroundOrDirectSync()
         }
     }
 
@@ -300,12 +463,8 @@ class FinancialViewModel(
         }
         viewModelScope.launch {
             try {
-                val id = repository.addOutstanding(date, amount, note)
-                val uid = authManager?.currentUser?.value?.uid
-                if (uid != null && syncManager != null) {
-                    val entry = OutstandingEntry(id = id, date = date, amount = amount, note = note)
-                    syncManager.uploadOutstanding(uid, entry)
-                }
+                repository.addOutstanding(date, amount, note)
+                triggerBackgroundOrDirectSync()
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.message ?: "Failed to save outstanding entry")
@@ -316,10 +475,7 @@ class FinancialViewModel(
     fun updateOutstanding(entry: OutstandingEntry, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             repository.updateOutstanding(entry)
-            val uid = authManager?.currentUser?.value?.uid
-            if (uid != null && syncManager != null) {
-                syncManager.uploadOutstanding(uid, entry)
-            }
+            triggerBackgroundOrDirectSync()
             onSuccess()
         }
     }
@@ -327,10 +483,7 @@ class FinancialViewModel(
     fun deleteOutstanding(entry: OutstandingEntry) {
         viewModelScope.launch {
             repository.deleteOutstanding(entry)
-            val uid = authManager?.currentUser?.value?.uid
-            if (uid != null && syncManager != null) {
-                syncManager.deleteOutstanding(uid, entry.id)
-            }
+            triggerBackgroundOrDirectSync()
         }
     }
 
@@ -358,12 +511,8 @@ class FinancialViewModel(
         }
         viewModelScope.launch {
             try {
-                val id = repository.addPayment(date, amount, note)
-                val uid = authManager?.currentUser?.value?.uid
-                if (uid != null && syncManager != null) {
-                    val pay = PaymentRecord(id = id, date = date, amount = amount, note = note)
-                    syncManager.uploadPayment(uid, pay)
-                }
+                repository.addPayment(date, amount, note)
+                triggerBackgroundOrDirectSync()
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.message ?: "Failed to record payment")
@@ -383,10 +532,7 @@ class FinancialViewModel(
         viewModelScope.launch {
             try {
                 repository.updatePayment(payment)
-                val uid = authManager?.currentUser?.value?.uid
-                if (uid != null && syncManager != null) {
-                    syncManager.uploadPayment(uid, payment)
-                }
+                triggerBackgroundOrDirectSync()
                 onSuccess()
             } catch (e: Exception) {
                 onError(e.message ?: "Failed to update payment")
@@ -397,14 +543,22 @@ class FinancialViewModel(
     fun deletePayment(payment: PaymentRecord) {
         viewModelScope.launch {
             repository.deletePayment(payment)
-            val uid = authManager?.currentUser?.value?.uid
-            if (uid != null && syncManager != null) {
-                syncManager.deletePayment(uid, payment.id)
-            }
+            triggerBackgroundOrDirectSync()
         }
     }
 
-    // Backup & Restore (JSON)
+    private fun triggerBackgroundOrDirectSync() {
+        val uid = authManager?.currentUser?.value?.uid
+        if (uid != null && syncManager != null && isOnline.value) {
+            viewModelScope.launch {
+                syncManager.flushPendingSyncQueue(uid)
+            }
+        } else {
+            appContext?.let { SyncWorker.enqueueSync(it) }
+        }
+    }
+
+    // Local JSON Backup & Restore
     fun exportBackup(context: Context, onFileReady: (File) -> Unit) {
         viewModelScope.launch {
             val jsonString = repository.exportBackupJson(
@@ -439,12 +593,22 @@ class FinancialViewModel(
 class FinancialViewModelFactory(
     private val repository: FinancialRepository,
     private val authManager: AuthManager? = null,
-    private val syncManager: FirestoreSyncManager? = null
+    private val syncManager: FirestoreSyncManager? = null,
+    private val syncQueueDao: SyncQueueDao? = null,
+    private val networkMonitor: NetworkMonitor? = null,
+    private val context: Context? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FinancialViewModel::class.java)) {
-            return FinancialViewModel(repository, authManager, syncManager) as T
+            return FinancialViewModel(
+                repository = repository,
+                authManager = authManager,
+                syncManager = syncManager,
+                syncQueueDao = syncQueueDao,
+                networkMonitor = networkMonitor,
+                appContext = context
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
