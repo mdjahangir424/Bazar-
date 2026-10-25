@@ -20,9 +20,19 @@ class FirestoreSyncManager(
     private val outstandingDao: OutstandingDao,
     private val paymentDao: PaymentDao
 ) {
-    private val firestore: FirebaseFirestore by lazy {
-        val dbId = context.getString(R.string.firestore_database_id)
-        FirebaseFirestore.getInstance(dbId)
+    private val firestore: FirebaseFirestore? by lazy {
+        FirebaseAppInitializer.ensureInitialized(context)
+        try {
+            val dbId = context.getString(R.string.firestore_database_id)
+            if (dbId.isNotBlank()) {
+                FirebaseFirestore.getInstance(dbId)
+            } else {
+                FirebaseFirestore.getInstance()
+            }
+        } catch (e: Exception) {
+            Log.e("FirestoreSyncManager", "Could not initialize Firestore: ${e.message}", e)
+            null
+        }
     }
 
     /**
@@ -30,9 +40,10 @@ class FirestoreSyncManager(
      * Guarantees that if the user deletes the app or switches devices, logging in recovers all accounts!
      */
     suspend fun syncDownFromCloud(userId: String): Result<Int> = withContext(Dispatchers.IO) {
+        val db = firestore ?: return@withContext Result.failure(IllegalStateException("Firestore is unavailable"))
         try {
             var count = 0
-            val userDoc = firestore.collection("users").document(userId)
+            val userDoc = db.collection("users").document(userId)
 
             // 1. Sync Market Expenses
             val expensesSnapshot = userDoc.collection("market_expenses").get().await()
@@ -136,7 +147,8 @@ class FirestoreSyncManager(
                 "note" to expense.note,
                 "createdAt" to expense.createdAt
             )
-            firestore.collection("users").document(userId)
+            val db = firestore ?: return@withContext
+            db.collection("users").document(userId)
                 .collection("market_expenses").document(docId)
                 .set(data).await()
         } catch (e: Exception) {
@@ -146,7 +158,8 @@ class FirestoreSyncManager(
 
     suspend fun deleteExpense(userId: String, expenseId: Long) = withContext(Dispatchers.IO) {
         try {
-            firestore.collection("users").document(userId)
+            val db = firestore ?: return@withContext
+            db.collection("users").document(userId)
                 .collection("market_expenses").document(expenseId.toString())
                 .delete().await()
         } catch (e: Exception) {
@@ -165,7 +178,8 @@ class FirestoreSyncManager(
                 "note" to entry.note,
                 "createdAt" to entry.createdAt
             )
-            firestore.collection("users").document(userId)
+            val db = firestore ?: return@withContext
+            db.collection("users").document(userId)
                 .collection("outstanding_entries").document(docId)
                 .set(data).await()
         } catch (e: Exception) {
@@ -175,7 +189,8 @@ class FirestoreSyncManager(
 
     suspend fun deleteOutstanding(userId: String, entryId: Long) = withContext(Dispatchers.IO) {
         try {
-            firestore.collection("users").document(userId)
+            val db = firestore ?: return@withContext
+            db.collection("users").document(userId)
                 .collection("outstanding_entries").document(entryId.toString())
                 .delete().await()
         } catch (e: Exception) {
@@ -194,7 +209,8 @@ class FirestoreSyncManager(
                 "note" to payment.note,
                 "createdAt" to payment.createdAt
             )
-            firestore.collection("users").document(userId)
+            val db = firestore ?: return@withContext
+            db.collection("users").document(userId)
                 .collection("payment_records").document(docId)
                 .set(data).await()
         } catch (e: Exception) {
@@ -204,7 +220,8 @@ class FirestoreSyncManager(
 
     suspend fun deletePayment(userId: String, paymentId: Long) = withContext(Dispatchers.IO) {
         try {
-            firestore.collection("users").document(userId)
+            val db = firestore ?: return@withContext
+            db.collection("users").document(userId)
                 .collection("payment_records").document(paymentId.toString())
                 .delete().await()
         } catch (e: Exception) {
@@ -222,8 +239,9 @@ class FirestoreSyncManager(
         outstanding: List<OutstandingEntry>,
         payments: List<PaymentRecord>
     ): Result<String> = withContext(Dispatchers.IO) {
+        val db = firestore ?: return@withContext Result.failure(IllegalStateException("Firestore is unavailable"))
         try {
-            val userDoc = firestore.collection("users").document(userId)
+            val userDoc = db.collection("users").document(userId)
 
             // 1. Upload all grocery expenses
             for (item in expenses) {
@@ -289,8 +307,9 @@ class FirestoreSyncManager(
      * Retrieve the latest cloud backup metadata
      */
     suspend fun getLatestBackupMetadata(userId: String): Result<Map<String, Any>?> = withContext(Dispatchers.IO) {
+        val db = firestore ?: return@withContext Result.failure(IllegalStateException("Firestore is unavailable"))
         try {
-            val doc = firestore.collection("users").document(userId)
+            val doc = db.collection("users").document(userId)
                 .collection("backup_metadata").document("latest").get().await()
             if (doc.exists()) {
                 Result.success(doc.data)

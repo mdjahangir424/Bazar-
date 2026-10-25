@@ -70,6 +70,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        com.example.data.cloud.FirebaseAppInitializer.ensureInitialized(applicationContext)
+
         val database = AppDatabase.getDatabase(applicationContext)
         val repository = FinancialRepository(
             expenseDao = database.expenseDao(),

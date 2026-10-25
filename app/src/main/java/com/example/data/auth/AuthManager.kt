@@ -25,14 +25,22 @@ import kotlinx.coroutines.tasks.await
 
 class AuthManager(private val context: Context) {
 
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val auth: FirebaseAuth? = run {
+        com.example.data.cloud.FirebaseAppInitializer.ensureInitialized(context)
+        try {
+            FirebaseAuth.getInstance()
+        } catch (e: Exception) {
+            Log.e("AuthManager", "FirebaseAuth initialization error: ${e.message}", e)
+            null
+        }
+    }
     private val credentialManager: CredentialManager = CredentialManager.create(context)
 
-    private val _currentUser = MutableStateFlow<FirebaseUser?>(auth.currentUser)
+    private val _currentUser = MutableStateFlow<FirebaseUser?>(auth?.currentUser)
     val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
 
     init {
-        auth.addAuthStateListener { firebaseAuth ->
+        auth?.addAuthStateListener { firebaseAuth ->
             _currentUser.value = firebaseAuth.currentUser
         }
     }
@@ -41,15 +49,24 @@ class AuthManager(private val context: Context) {
      * Silent auto sign-in on app start
      */
     fun attemptAutoSignIn(scope: CoroutineScope, onComplete: (Boolean) -> Unit = {}) {
-        if (auth.currentUser != null) {
-            _currentUser.value = auth.currentUser
+        val currentAuth = auth ?: run {
+            onComplete(false)
+            return
+        }
+
+        if (currentAuth.currentUser != null) {
+            _currentUser.value = currentAuth.currentUser
             onComplete(true)
             return
         }
 
         val clientId = try {
-            context.getString(R.string.default_web_client_id)
+            context.getString(R.string.default_web_client_id).ifBlank { null }
         } catch (e: Exception) {
+            null
+        }
+
+        if (clientId.isNullOrBlank()) {
             onComplete(false)
             return
         }
@@ -71,8 +88,8 @@ class AuthManager(private val context: Context) {
                 if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                     val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                    auth.signInWithCredential(authCredential).await()
-                    _currentUser.value = auth.currentUser
+                    currentAuth.signInWithCredential(authCredential).await()
+                    _currentUser.value = currentAuth.currentUser
                     onComplete(true)
                 } else {
                     onComplete(false)
@@ -93,10 +110,19 @@ class AuthManager(private val context: Context) {
         onError: (String) -> Unit,
         onCancelled: () -> Unit = {}
     ) {
+        val currentAuth = auth ?: run {
+            onError("Authentication service is unavailable")
+            return
+        }
+
         val clientId = try {
-            context.getString(R.string.default_web_client_id)
+            context.getString(R.string.default_web_client_id).ifBlank { null }
         } catch (e: Exception) {
-            onError("Google Web Client ID missing")
+            null
+        }
+
+        if (clientId.isNullOrBlank()) {
+            onError("Google Sign-In is not configured yet (web client ID missing).")
             return
         }
 
@@ -112,7 +138,7 @@ class AuthManager(private val context: Context) {
                 if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                     val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                    val authResult = auth.signInWithCredential(authCredential).await()
+                    val authResult = currentAuth.signInWithCredential(authCredential).await()
                     val user = authResult.user
                     if (user != null) {
                         _currentUser.value = user
@@ -137,7 +163,7 @@ class AuthManager(private val context: Context) {
      * Sign out of Firebase and clear CredentialManager
      */
     fun signOut(scope: CoroutineScope, onComplete: () -> Unit = {}) {
-        auth.signOut()
+        auth?.signOut()
         _currentUser.value = null
         scope.launch {
             try {
