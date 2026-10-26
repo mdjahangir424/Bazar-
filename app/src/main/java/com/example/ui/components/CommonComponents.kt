@@ -379,7 +379,7 @@ fun EditRecordDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val parsed = amountText.toDoubleOrNull()
+                    val parsed = BanglaFormatter.parseAmount(amountText)
                     if (parsed == null || parsed <= 0) {
                         errorText = if (language == AppLanguage.BANGLA) "সঠিক টাকার পরিমাণ লিখুন" else "Enter valid amount"
                         return@Button

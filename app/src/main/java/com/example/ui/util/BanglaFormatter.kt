@@ -73,6 +73,36 @@ object BanglaFormatter {
     }
 
     /**
+     * Parse any numeric input whether written with English digits (0-9)
+     * or Bengali digits (০-৯), with optional BDT symbol (৳), commas, spaces, etc.
+     */
+    fun parseAmount(input: String?): Double? {
+        if (input.isNullOrBlank()) return null
+        val cleaned = input.trim()
+            .replace("৳", "")
+            .replace(",", "")
+            .replace(" ", "")
+            .replace("।", ".")
+        val sb = StringBuilder()
+        for (ch in cleaned) {
+            when (ch) {
+                '০' -> sb.append('0')
+                '১' -> sb.append('1')
+                '২' -> sb.append('2')
+                '৩' -> sb.append('3')
+                '৪' -> sb.append('4')
+                '৫' -> sb.append('5')
+                '৬' -> sb.append('6')
+                '৭' -> sb.append('7')
+                '৮' -> sb.append('8')
+                '৯' -> sb.append('9')
+                else -> sb.append(ch)
+            }
+        }
+        return sb.toString().toDoubleOrNull()
+    }
+
+    /**
      * Convert standard English digits 0-9 to Bengali digits ০-৯
      */
     fun toBanglaDigits(input: String): String {

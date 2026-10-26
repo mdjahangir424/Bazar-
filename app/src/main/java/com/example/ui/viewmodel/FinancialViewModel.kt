@@ -59,8 +59,30 @@ class FinancialViewModel(
     private val appContext: Context? = null
 ) : ViewModel() {
 
-    private val _userProfile = MutableStateFlow(UserProfile())
+    private val prefs by lazy {
+        appContext?.getSharedPreferences("hisab_khata_user_profile", Context.MODE_PRIVATE)
+    }
+
+    private val _userProfile = MutableStateFlow(loadInitialProfile())
     val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
+
+    private fun loadInitialProfile(): UserProfile {
+        val p = prefs ?: return UserProfile()
+        val name = p.getString("profile_name", null)
+        val phone = p.getString("profile_phone", null)
+        val email = p.getString("profile_email", null)
+        val gender = p.getString("profile_gender", null)
+        return if (!name.isNullOrBlank() || !phone.isNullOrBlank() || !email.isNullOrBlank() || !gender.isNullOrBlank()) {
+            UserProfile(
+                name = name ?: "মো: জাহাঙ্গীর আলম",
+                phone = phone ?: "+8801778600028",
+                email = email ?: "mdjahangiralam2528@gmail.com",
+                gender = gender ?: "ছেলে"
+            )
+        } else {
+            UserProfile()
+        }
+    }
 
     private val _language = MutableStateFlow(AppLanguage.BANGLA)
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
@@ -103,7 +125,7 @@ class FinancialViewModel(
     val lastCloudBackupTime: StateFlow<String?> = _lastCloudBackupTime.asStateFlow()
 
     init {
-        // Observe auth state changes to start/stop live sync and flush offline queue
+        // Observe auth state changes to start/stop live sync, flush offline queue, and sync profile
         viewModelScope.launch {
             currentUser.collect { user ->
                 if (user != null) {
@@ -111,6 +133,40 @@ class FinancialViewModel(
                     // Trigger queue flush and initial sync
                     syncManager?.flushPendingSyncQueue(user.uid)
                     loadAvailableBackups()
+
+                    // Sync user profile with cloud
+                    try {
+                        val cloudProfileRes = syncManager?.getUserProfileFromCloud(user.uid)
+                        val cloudProfile = cloudProfileRes?.getOrNull()
+                        if (cloudProfile != null && cloudProfile["name"]?.isNotBlank() == true) {
+                            val loaded = UserProfile(
+                                name = cloudProfile["name"] ?: _userProfile.value.name,
+                                phone = cloudProfile["phone"] ?: _userProfile.value.phone,
+                                email = cloudProfile["email"] ?: _userProfile.value.email,
+                                gender = cloudProfile["gender"] ?: _userProfile.value.gender
+                            )
+                            _userProfile.value = loaded
+                            prefs?.edit()?.apply {
+                                putString("profile_name", loaded.name)
+                                putString("profile_phone", loaded.phone)
+                                putString("profile_email", loaded.email)
+                                putString("profile_gender", loaded.gender)
+                                apply()
+                            }
+                        } else {
+                            // If cloud profile empty, upload local profile
+                            val cur = _userProfile.value
+                            syncManager?.saveUserProfileToCloud(
+                                user.uid,
+                                cur.name,
+                                cur.phone,
+                                cur.email,
+                                cur.gender
+                            )
+                        }
+                    } catch (e: Exception) {
+                        // Profile cloud sync non-blocking
+                    }
                 } else {
                     syncManager?.stopLiveSync()
                     _availableBackups.value = emptyList()
@@ -180,12 +236,32 @@ class FinancialViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), FinancialSummary())
 
     fun updateProfile(name: String, phone: String, email: String, gender: String) {
-        _userProfile.value = UserProfile(
-            name = name.ifBlank { "মো: জাহাঙ্গীর আলম (Md Jahangir Alam)" },
-            phone = phone.ifBlank { "+8801778600028" },
-            email = email.ifBlank { "mdjahangiralam2528@gmail.com" },
+        val updated = UserProfile(
+            name = name.trim().ifBlank { "মো: জাহাঙ্গীর আলম" },
+            phone = phone.trim().ifBlank { "+8801778600028" },
+            email = email.trim().ifBlank { "mdjahangiralam2528@gmail.com" },
             gender = gender
         )
+        _userProfile.value = updated
+        prefs?.edit()?.apply {
+            putString("profile_name", updated.name)
+            putString("profile_phone", updated.phone)
+            putString("profile_email", updated.email)
+            putString("profile_gender", updated.gender)
+            apply()
+        }
+        val uid = authManager?.currentUser?.value?.uid
+        if (uid != null && syncManager != null) {
+            viewModelScope.launch {
+                syncManager.saveUserProfileToCloud(
+                    uid,
+                    updated.name,
+                    updated.phone,
+                    updated.email,
+                    updated.gender
+                )
+            }
+        }
     }
 
     fun setLanguage(lang: AppLanguage) {
@@ -378,7 +454,28 @@ class FinancialViewModel(
     }
 
     fun triggerImmediateSync(onResult: (Result<Int>) -> Unit = {}) {
-        flushPendingSync(onResult)
+        val uid = authManager?.currentUser?.value?.uid
+        if (uid != null && syncManager != null) {
+            viewModelScope.launch {
+                try {
+                    // 1. Ensure live sync listener is active
+                    syncManager.startLiveSync(uid, viewModelScope)
+                    // 2. Flush pending local offline queue to Cloud
+                    val flushRes = syncManager.flushPendingSyncQueue(uid)
+                    // 3. Pull latest records down from Cloud
+                    val pullRes = syncManager.syncDownFromCloud(uid)
+                    // 4. Reload cloud backup list
+                    loadAvailableBackups()
+                    val totalProcessed = (flushRes.getOrNull() ?: 0) + (pullRes.getOrNull() ?: 0)
+                    onResult(Result.success(totalProcessed))
+                } catch (e: Exception) {
+                    onResult(Result.failure(e))
+                }
+            }
+        } else {
+            appContext?.let { SyncWorker.enqueueSync(it) }
+            onResult(Result.failure(IllegalStateException(if (_language.value == AppLanguage.BANGLA) "দয়া করে প্রথমে গুগল বা ইমেইল দিয়ে সাইন ইন করুন" else "Please sign in first")))
+        }
     }
 
     fun backupAllToCloud(onResult: (Result<String>) -> Unit) {
@@ -500,12 +597,12 @@ class FinancialViewModel(
             return
         }
         val currentBalance = summary.value.totalOutstandingBalance
-        if (!_allowNegativeBalance.value && amount > currentBalance) {
+        if (!_allowNegativeBalance.value && currentBalance > 0 && amount > (currentBalance + 0.001)) {
             onError(
                 if (_language.value == AppLanguage.BANGLA)
-                    "পরিশোধের পরিমাণ (৳$amount) বর্তমান বাকি ব্যালেন্সের (৳$currentBalance) চেয়ে বেশি হতে পারে না!"
+                    "পরিশোধের পরিমাণ (${BanglaFormatter.formatCurrency(amount, true)}) বর্তমান বাকি ব্যালেন্সের (${BanglaFormatter.formatCurrency(currentBalance, true)}) চেয়ে বেশি হতে পারে না! (প্রয়োজনে সেটিংস থেকে 'নেগেটিভ ব্যালেন্স' চালু করতে পারেন)"
                 else
-                    "Payment amount (৳$amount) cannot exceed current outstanding balance (৳$currentBalance)!"
+                    "Payment amount (${BanglaFormatter.formatCurrency(amount, false)}) cannot exceed current balance (${BanglaFormatter.formatCurrency(currentBalance, false)})! (Enable negative balance in Settings if needed)"
             )
             return
         }

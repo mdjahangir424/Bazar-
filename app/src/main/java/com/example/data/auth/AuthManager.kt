@@ -72,12 +72,7 @@ class AuthManager(private val context: Context) {
             context.getString(R.string.default_web_client_id).ifBlank { null }
         } catch (e: Exception) {
             null
-        }
-
-        if (clientId.isNullOrBlank()) {
-            onComplete(false)
-            return
-        }
+        } ?: "785275446779-946uiiu029b9l7ro3dhoe6h8479mp31f.apps.googleusercontent.com"
 
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(true)
@@ -127,12 +122,7 @@ class AuthManager(private val context: Context) {
             context.getString(R.string.default_web_client_id).ifBlank { null }
         } catch (e: Exception) {
             null
-        }
-
-        if (clientId.isNullOrBlank()) {
-            onError("Google Sign-In is not configured yet (web client ID missing).")
-            return
-        }
+        } ?: "785275446779-946uiiu029b9l7ro3dhoe6h8479mp31f.apps.googleusercontent.com"
 
         val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = clientId).build()
         val request = GetCredentialRequest.Builder()

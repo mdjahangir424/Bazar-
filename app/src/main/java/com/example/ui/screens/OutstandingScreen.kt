@@ -334,7 +334,7 @@ fun OutstandingScreen(
 
                     Button(
                         onClick = {
-                            val parsedAmount = inputAmount.toDoubleOrNull()
+                            val parsedAmount = BanglaFormatter.parseAmount(inputAmount)
                             if (parsedAmount == null || parsedAmount <= 0) {
                                 inputError = if (isBn) "সঠিক টাকার পরিমাণ লিখুন (০ এর বেশি)" else "Enter valid amount (> 0)"
                                 return@Button

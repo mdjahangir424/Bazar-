@@ -13,6 +13,7 @@ import com.example.data.model.OutstandingEntry
 import com.example.data.model.PaymentRecord
 import com.example.data.model.SyncQueueItem
 import com.google.firebase.firestore.DocumentChange
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -43,15 +44,24 @@ class FirestoreSyncManager(
     private val firestore: FirebaseFirestore? by lazy {
         FirebaseAppInitializer.ensureInitialized(context)
         try {
-            val dbId = context.getString(R.string.firestore_database_id)
-            if (dbId.isNotBlank()) {
-                FirebaseFirestore.getInstance(dbId)
+            val dbId = context.getString(R.string.firestore_database_id).trim()
+            if (dbId.isNotBlank() && dbId != "(default)") {
+                try {
+                    FirebaseFirestore.getInstance(dbId)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Custom databaseId '$dbId' init failed, falling back to default: ${e.message}")
+                    FirebaseFirestore.getInstance()
+                }
             } else {
                 FirebaseFirestore.getInstance()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Could not initialize Firestore: ${e.message}", e)
-            null
+            try {
+                FirebaseFirestore.getInstance()
+            } catch (ex: Exception) {
+                null
+            }
         }
     }
 
@@ -68,6 +78,42 @@ class FirestoreSyncManager(
     private var outstandingListener: ListenerRegistration? = null
     private var paymentListener: ListenerRegistration? = null
     private var currentActiveUserId: String? = null
+
+    // Safe field extractors to prevent ClassCastException (e.g. Long cannot be cast to Double)
+    private fun getDoubleSafe(doc: DocumentSnapshot, field: String): Double {
+        val obj = doc.get(field) ?: return 0.0
+        return when (obj) {
+            is Number -> obj.toDouble()
+            is String -> obj.toDoubleOrNull() ?: 0.0
+            else -> 0.0
+        }
+    }
+
+    private fun getLongSafe(doc: DocumentSnapshot, field: String, defaultVal: Long = 0L): Long {
+        val obj = doc.get(field) ?: return defaultVal
+        return when (obj) {
+            is Number -> obj.toLong()
+            is String -> obj.toLongOrNull() ?: defaultVal
+            else -> defaultVal
+        }
+    }
+
+    private fun getIntSafe(doc: DocumentSnapshot, field: String, defaultVal: Int = 1): Int {
+        val obj = doc.get(field) ?: return defaultVal
+        return when (obj) {
+            is Number -> obj.toInt()
+            is String -> obj.toIntOrNull() ?: defaultVal
+            else -> defaultVal
+        }
+    }
+
+    private fun getDoubleFromJson(obj: JSONObject, field: String): Double {
+        return try {
+            if (obj.has(field)) obj.getDouble(field) else 0.0
+        } catch (e: Exception) {
+            obj.optString(field).toDoubleOrNull() ?: 0.0
+        }
+    }
 
     /**
      * Start Real-Time Live Sync listeners on Cloud Firestore for the authenticated user.
@@ -95,31 +141,36 @@ class FirestoreSyncManager(
                     if (snapshots == null) return@addSnapshotListener
 
                     scope.launch(Dispatchers.IO) {
-                        for (change in snapshots.documentChanges) {
-                            val doc = change.document
-                            val isDeleted = doc.getBoolean("deleted") == true || doc.get("deletedAt") != null
-                            val docId = doc.id.toLongOrNull() ?: continue
+                        try {
+                            for (change in snapshots.documentChanges) {
+                                val doc = change.document
+                                val isDeleted = doc.getBoolean("deleted") == true || doc.get("deletedAt") != null
+                                val docId = doc.id.toLongOrNull() ?: getLongSafe(doc, "id", 0L)
+                                val finalId = if (docId > 0L) docId else (System.currentTimeMillis() % 1000000000L)
 
-                            if (isDeleted || change.type == DocumentChange.Type.REMOVED) {
-                                expenseDao.deleteById(docId)
-                            } else {
-                                val serial = doc.getLong("serialNo")?.toInt() ?: 1
-                                val date = doc.getString("date") ?: ""
-                                val amount = doc.getDouble("amount") ?: 0.0
-                                val note = doc.getString("note") ?: ""
-                                val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
-                                if (date.isNotBlank() && amount > 0) {
-                                    val item = MarketExpense(
-                                        id = docId,
-                                        serialNo = serial,
-                                        date = date,
-                                        amount = amount,
-                                        note = note,
-                                        createdAt = createdAt
-                                    )
-                                    expenseDao.insertExpense(item)
+                                if (isDeleted || change.type == DocumentChange.Type.REMOVED) {
+                                    expenseDao.deleteById(finalId)
+                                } else {
+                                    val serial = getIntSafe(doc, "serialNo", 1)
+                                    val date = doc.getString("date") ?: ""
+                                    val amount = getDoubleSafe(doc, "amount")
+                                    val note = doc.getString("note") ?: ""
+                                    val createdAt = getLongSafe(doc, "createdAt", System.currentTimeMillis())
+                                    if (date.isNotBlank() && amount > 0) {
+                                        val item = MarketExpense(
+                                            id = finalId,
+                                            serialNo = serial,
+                                            date = date,
+                                            amount = amount,
+                                            note = note,
+                                            createdAt = createdAt
+                                        )
+                                        expenseDao.insertExpense(item)
+                                    }
                                 }
                             }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing expense snapshot changes", e)
                         }
                     }
                 }
@@ -134,31 +185,36 @@ class FirestoreSyncManager(
                     if (snapshots == null) return@addSnapshotListener
 
                     scope.launch(Dispatchers.IO) {
-                        for (change in snapshots.documentChanges) {
-                            val doc = change.document
-                            val isDeleted = doc.getBoolean("deleted") == true || doc.get("deletedAt") != null
-                            val docId = doc.id.toLongOrNull() ?: continue
+                        try {
+                            for (change in snapshots.documentChanges) {
+                                val doc = change.document
+                                val isDeleted = doc.getBoolean("deleted") == true || doc.get("deletedAt") != null
+                                val docId = doc.id.toLongOrNull() ?: getLongSafe(doc, "id", 0L)
+                                val finalId = if (docId > 0L) docId else (System.currentTimeMillis() % 1000000000L)
 
-                            if (isDeleted || change.type == DocumentChange.Type.REMOVED) {
-                                outstandingDao.deleteById(docId)
-                            } else {
-                                val serial = doc.getLong("serialNo")?.toInt() ?: 1
-                                val date = doc.getString("date") ?: ""
-                                val amount = doc.getDouble("amount") ?: 0.0
-                                val note = doc.getString("note") ?: ""
-                                val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
-                                if (date.isNotBlank() && amount > 0) {
-                                    val item = OutstandingEntry(
-                                        id = docId,
-                                        serialNo = serial,
-                                        date = date,
-                                        amount = amount,
-                                        note = note,
-                                        createdAt = createdAt
-                                    )
-                                    outstandingDao.insertOutstanding(item)
+                                if (isDeleted || change.type == DocumentChange.Type.REMOVED) {
+                                    outstandingDao.deleteById(finalId)
+                                } else {
+                                    val serial = getIntSafe(doc, "serialNo", 1)
+                                    val date = doc.getString("date") ?: ""
+                                    val amount = getDoubleSafe(doc, "amount")
+                                    val note = doc.getString("note") ?: ""
+                                    val createdAt = getLongSafe(doc, "createdAt", System.currentTimeMillis())
+                                    if (date.isNotBlank() && amount > 0) {
+                                        val item = OutstandingEntry(
+                                            id = finalId,
+                                            serialNo = serial,
+                                            date = date,
+                                            amount = amount,
+                                            note = note,
+                                            createdAt = createdAt
+                                        )
+                                        outstandingDao.insertOutstanding(item)
+                                    }
                                 }
                             }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing outstanding snapshot changes", e)
                         }
                     }
                 }
@@ -173,31 +229,36 @@ class FirestoreSyncManager(
                     if (snapshots == null) return@addSnapshotListener
 
                     scope.launch(Dispatchers.IO) {
-                        for (change in snapshots.documentChanges) {
-                            val doc = change.document
-                            val isDeleted = doc.getBoolean("deleted") == true || doc.get("deletedAt") != null
-                            val docId = doc.id.toLongOrNull() ?: continue
+                        try {
+                            for (change in snapshots.documentChanges) {
+                                val doc = change.document
+                                val isDeleted = doc.getBoolean("deleted") == true || doc.get("deletedAt") != null
+                                val docId = doc.id.toLongOrNull() ?: getLongSafe(doc, "id", 0L)
+                                val finalId = if (docId > 0L) docId else (System.currentTimeMillis() % 1000000000L)
 
-                            if (isDeleted || change.type == DocumentChange.Type.REMOVED) {
-                                paymentDao.deleteById(docId)
-                            } else {
-                                val serial = doc.getLong("serialNo")?.toInt() ?: 1
-                                val date = doc.getString("date") ?: ""
-                                val amount = doc.getDouble("amount") ?: 0.0
-                                val note = doc.getString("note") ?: ""
-                                val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
-                                if (date.isNotBlank() && amount > 0) {
-                                    val item = PaymentRecord(
-                                        id = docId,
-                                        serialNo = serial,
-                                        date = date,
-                                        amount = amount,
-                                        note = note,
-                                        createdAt = createdAt
-                                    )
-                                    paymentDao.insertPayment(item)
+                                if (isDeleted || change.type == DocumentChange.Type.REMOVED) {
+                                    paymentDao.deleteById(finalId)
+                                } else {
+                                    val serial = getIntSafe(doc, "serialNo", 1)
+                                    val date = doc.getString("date") ?: ""
+                                    val amount = getDoubleSafe(doc, "amount")
+                                    val note = doc.getString("note") ?: ""
+                                    val createdAt = getLongSafe(doc, "createdAt", System.currentTimeMillis())
+                                    if (date.isNotBlank() && amount > 0) {
+                                        val item = PaymentRecord(
+                                            id = finalId,
+                                            serialNo = serial,
+                                            date = date,
+                                            amount = amount,
+                                            note = note,
+                                            createdAt = createdAt
+                                        )
+                                        paymentDao.insertPayment(item)
+                                    }
                                 }
                             }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing payment snapshot changes", e)
                         }
                     }
                 }
@@ -250,18 +311,24 @@ class FirestoreSyncManager(
                     val docRef = userDoc.collection(collectionName).document(item.entityId.toString())
 
                     if (item.operation == "DELETE") {
-                        val deletePayload = hashMapOf(
-                            "deleted" to true,
-                            "deletedAt" to System.currentTimeMillis(),
-                            "ownerUid" to userId,
-                            "updatedAt" to FieldValue.serverTimestamp()
-                        )
-                        docRef.set(deletePayload, SetOptions.merge()).await()
-                        docRef.delete().await()
+                        try {
+                            docRef.delete().await()
+                        } catch (ex: Exception) {
+                            Log.w(TAG, "Direct delete failed, marking as deleted: ${ex.message}")
+                            val deletePayload = hashMapOf(
+                                "deleted" to true,
+                                "deletedAt" to System.currentTimeMillis(),
+                                "ownerUid" to userId,
+                                "userId" to userId,
+                                "updatedAt" to FieldValue.serverTimestamp()
+                            )
+                            docRef.set(deletePayload, SetOptions.merge()).await()
+                        }
                     } else {
                         // INSERT or UPDATE
                         val payloadMap = parseJsonToMap(item.payloadJson)
                         payloadMap["ownerUid"] = userId
+                        payloadMap["userId"] = userId
                         payloadMap["updatedAt"] = FieldValue.serverTimestamp()
                         docRef.set(payloadMap, SetOptions.merge()).await()
                     }
@@ -305,15 +372,17 @@ class FirestoreSyncManager(
             val cloudExpenses = mutableListOf<MarketExpense>()
             for (doc in expensesSnapshot.documents) {
                 if (doc.getBoolean("deleted") == true || doc.get("deletedAt") != null) continue
-                val serial = doc.getLong("serialNo")?.toInt() ?: 1
+                val docId = doc.id.toLongOrNull() ?: getLongSafe(doc, "id", 0L)
+                val finalId = if (docId > 0L) docId else (System.currentTimeMillis() % 1000000000L)
+                val serial = getIntSafe(doc, "serialNo", 1)
                 val date = doc.getString("date") ?: ""
-                val amount = doc.getDouble("amount") ?: 0.0
+                val amount = getDoubleSafe(doc, "amount")
                 val note = doc.getString("note") ?: ""
-                val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+                val createdAt = getLongSafe(doc, "createdAt", System.currentTimeMillis())
                 if (date.isNotBlank() && amount > 0) {
                     cloudExpenses.add(
                         MarketExpense(
-                            id = doc.id.toLongOrNull() ?: 0L,
+                            id = finalId,
                             serialNo = serial,
                             date = date,
                             amount = amount,
@@ -333,15 +402,17 @@ class FirestoreSyncManager(
             val cloudOutstanding = mutableListOf<OutstandingEntry>()
             for (doc in outSnapshot.documents) {
                 if (doc.getBoolean("deleted") == true || doc.get("deletedAt") != null) continue
-                val serial = doc.getLong("serialNo")?.toInt() ?: 1
+                val docId = doc.id.toLongOrNull() ?: getLongSafe(doc, "id", 0L)
+                val finalId = if (docId > 0L) docId else (System.currentTimeMillis() % 1000000000L)
+                val serial = getIntSafe(doc, "serialNo", 1)
                 val date = doc.getString("date") ?: ""
-                val amount = doc.getDouble("amount") ?: 0.0
+                val amount = getDoubleSafe(doc, "amount")
                 val note = doc.getString("note") ?: ""
-                val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+                val createdAt = getLongSafe(doc, "createdAt", System.currentTimeMillis())
                 if (date.isNotBlank() && amount > 0) {
                     cloudOutstanding.add(
                         OutstandingEntry(
-                            id = doc.id.toLongOrNull() ?: 0L,
+                            id = finalId,
                             serialNo = serial,
                             date = date,
                             amount = amount,
@@ -361,15 +432,17 @@ class FirestoreSyncManager(
             val cloudPayments = mutableListOf<PaymentRecord>()
             for (doc in paySnapshot.documents) {
                 if (doc.getBoolean("deleted") == true || doc.get("deletedAt") != null) continue
-                val serial = doc.getLong("serialNo")?.toInt() ?: 1
+                val docId = doc.id.toLongOrNull() ?: getLongSafe(doc, "id", 0L)
+                val finalId = if (docId > 0L) docId else (System.currentTimeMillis() % 1000000000L)
+                val serial = getIntSafe(doc, "serialNo", 1)
                 val date = doc.getString("date") ?: ""
-                val amount = doc.getDouble("amount") ?: 0.0
+                val amount = getDoubleSafe(doc, "amount")
                 val note = doc.getString("note") ?: ""
-                val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+                val createdAt = getLongSafe(doc, "createdAt", System.currentTimeMillis())
                 if (date.isNotBlank() && amount > 0) {
                     cloudPayments.add(
                         PaymentRecord(
-                            id = doc.id.toLongOrNull() ?: 0L,
+                            id = finalId,
                             serialNo = serial,
                             date = date,
                             amount = amount,
@@ -452,6 +525,7 @@ class FirestoreSyncManager(
                 "backupTime" to backupTime,
                 "timestamp" to timestamp,
                 "ownerUid" to userId,
+                "userId" to userId,
                 "schemaVersion" to 2,
                 "expensesCount" to expenses.size,
                 "outstandingCount" to outstanding.size,
@@ -472,6 +546,8 @@ class FirestoreSyncManager(
                 "latestBackupId" to backupId,
                 "backupTime" to backupTime,
                 "timestamp" to timestamp,
+                "ownerUid" to userId,
+                "userId" to userId,
                 "expensesCount" to expenses.size,
                 "outstandingCount" to outstanding.size,
                 "paymentsCount" to payments.size,
@@ -512,12 +588,12 @@ class FirestoreSyncManager(
             for (doc in snapshots.documents) {
                 val bId = doc.getString("backupId") ?: doc.id
                 val bTime = doc.getString("backupTime") ?: ""
-                val bTimestamp = doc.getLong("timestamp") ?: 0L
-                val expCount = doc.getLong("expensesCount")?.toInt() ?: 0
-                val outCount = doc.getLong("outstandingCount")?.toInt() ?: 0
-                val payCount = doc.getLong("paymentsCount")?.toInt() ?: 0
-                val totalExp = doc.getDouble("totalExpenses") ?: 0.0
-                val netBal = doc.getDouble("netBalance") ?: 0.0
+                val bTimestamp = getLongSafe(doc, "timestamp", 0L)
+                val expCount = getIntSafe(doc, "expensesCount", 0)
+                val outCount = getIntSafe(doc, "outstandingCount", 0)
+                val payCount = getIntSafe(doc, "paymentsCount", 0)
+                val totalExp = getDoubleSafe(doc, "totalExpenses")
+                val netBal = getDoubleSafe(doc, "netBalance")
 
                 list.add(
                     BackupSnapshotInfo(
@@ -577,7 +653,7 @@ class FirestoreSyncManager(
                             id = if (isReplaceMode) obj.optLong("id", 0) else 0,
                             serialNo = obj.optInt("serialNo", i + 1),
                             date = obj.getString("date"),
-                            amount = obj.getDouble("amount"),
+                            amount = getDoubleFromJson(obj, "amount"),
                             note = obj.optString("note", ""),
                             createdAt = obj.optLong("createdAt", System.currentTimeMillis())
                         )
@@ -598,7 +674,7 @@ class FirestoreSyncManager(
                             id = if (isReplaceMode) obj.optLong("id", 0) else 0,
                             serialNo = obj.optInt("serialNo", i + 1),
                             date = obj.getString("date"),
-                            amount = obj.getDouble("amount"),
+                            amount = getDoubleFromJson(obj, "amount"),
                             note = obj.optString("note", ""),
                             createdAt = obj.optLong("createdAt", System.currentTimeMillis())
                         )
@@ -619,7 +695,7 @@ class FirestoreSyncManager(
                             id = if (isReplaceMode) obj.optLong("id", 0) else 0,
                             serialNo = obj.optInt("serialNo", i + 1),
                             date = obj.getString("date"),
-                            amount = obj.getDouble("amount"),
+                            amount = getDoubleFromJson(obj, "amount"),
                             note = obj.optString("note", ""),
                             createdAt = obj.optLong("createdAt", System.currentTimeMillis())
                         )
@@ -651,6 +727,66 @@ class FirestoreSyncManager(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching backup metadata", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Save user profile details (Name, Phone, Email, Gender) to Cloud Firestore
+     */
+    suspend fun saveUserProfileToCloud(
+        userId: String,
+        name: String,
+        phone: String,
+        email: String,
+        gender: String
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        val db = firestore ?: return@withContext Result.failure(IllegalStateException("Firestore unavailable"))
+        try {
+            val profileMap = hashMapOf(
+                "name" to name,
+                "phone" to phone,
+                "email" to email,
+                "gender" to gender,
+                "ownerUid" to userId,
+                "userId" to userId,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            db.collection("users").document(userId).set(profileMap, SetOptions.merge()).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving profile to cloud", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Fetch user profile details from Cloud Firestore
+     */
+    suspend fun getUserProfileFromCloud(userId: String): Result<Map<String, String>?> = withContext(Dispatchers.IO) {
+        val db = firestore ?: return@withContext Result.failure(IllegalStateException("Firestore unavailable"))
+        try {
+            val doc = db.collection("users").document(userId).get().await()
+            if (doc.exists()) {
+                val name = doc.getString("name") ?: ""
+                val phone = doc.getString("phone") ?: ""
+                val email = doc.getString("email") ?: ""
+                val gender = doc.getString("gender") ?: "ছেলে"
+                if (name.isNotBlank()) {
+                    Result.success(mapOf(
+                        "name" to name,
+                        "phone" to phone,
+                        "email" to email,
+                        "gender" to gender
+                    ))
+                } else {
+                    Result.success(null)
+                }
+            } else {
+                Result.success(null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching profile from cloud", e)
             Result.failure(e)
         }
     }
